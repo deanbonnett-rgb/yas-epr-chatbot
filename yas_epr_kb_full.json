@@ -1,0 +1,1049 @@
+[
+  {
+    "id": "KB-001",
+    "category": "Connectivity",
+    "subcategory": "Getac – No connectivity / ePR offline",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Troubleshoot a Getac device where ePR is running offline or has no Vodafone/cellular connectivity.",
+    "triggers": [
+      "ePR running offline",
+      "No Vodafone signal on Getac",
+      "Jobs not syncing",
+      "Hospital can’t see full ePR",
+      "No connectivity on Getac"
+    ],
+    "prechecks": [
+      "Confirm caller is using a Getac ePR device.",
+      "Ask where the crew are (hospital, station, scene).",
+      "Ask if they can see or are connected to GovRoam."
+    ],
+    "steps": [
+      "Ask crew to press the P2 button on the front of the Getac or swipe in from the right edge of the screen to open the action/notification menu.",
+      "Ask them to tap 'Network' at the bottom.",
+      "If connected to 'GovRoam', ask them to tap it and select 'Disconnect'.",
+      "Ensure 'Cellular' is turned on (highlighted/blue) and Airplane mode is OFF.",
+      "Check that the Vodafone connection is showing as connected. It may show 'No internet access' but this can be normal for ePR.",
+      "If there is no Vodafone/cellular adapter showing at all, ask the crew to restart the Getac.",
+      "If Vodafone still does not appear after a restart, log the device for rebuild or swap-out as a likely driver/modem issue."
+    ],
+    "important_notes": [
+      "If connectivity is lost mid-ePR, the hospital may only see part of the record.",
+      "To ensure all data is sent, the crew must connect to a YAS network (e.g. station Wi-Fi) and relaunch the ePR client so it can sync local data.",
+      "If the crew refuse to travel to a YAS station to sync, they must rewrite the full record on paper – do not leave data stored only on the device."
+    ],
+    "escalation": [
+      "If Vodafone/cellular adapter is still completely missing after reboot, arrange device swap-out/rebuild.",
+      "If several devices in the same area are affected, escalate as a possible network or infrastructure outage."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 29: Connectivity",
+      "Getac Service Desk Doc – No Connectivity"
+    ]
+  },
+  {
+    "id": "KB-002",
+    "category": "Hardware",
+    "subcategory": "Getac brightness too dim",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Resolve issues where the Getac screen is very dim even when brightness appears to be on maximum.",
+    "triggers": [
+      "Screen very dim",
+      "Can’t see the screen",
+      "Brightness controls not working properly"
+    ],
+    "prechecks": [
+      "Confirm the issue is with screen brightness rather than ePR content.",
+      "Confirm the crew are using a Getac ePR device."
+    ],
+    "steps": [
+      "Ask the crew to press FN + F7 on the Getac keyboard to increase brightness.",
+      "If the screen is still dim, ask the crew to carefully check both battery flaps on the left and right sides of the device.",
+      "Ask them to ensure each battery flap is fully closed with no visible gaps at any corner.",
+      "Once flaps are fully closed, recheck the screen brightness."
+    ],
+    "important_notes": [
+      "Partially open battery flaps can force the device into a low-brightness mode.",
+      "The crew may think a flap is closed when there is still a small gap at one corner."
+    ],
+    "escalation": [
+      "If the brightness is still low after flap checks and FN + F7, log the device for further hardware investigation or swap-out."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 3: Getac brightness"
+    ]
+  },
+  {
+    "id": "KB-003",
+    "category": "Hardware",
+    "subcategory": "Lights on but screen black",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Fix a Getac device that appears to have power (LEDs on) but the screen remains black.",
+    "triggers": [
+      "Power lights on but no display",
+      "Screen black even though device is on"
+    ],
+    "prechecks": [
+      "Confirm power indicator LEDs are lit.",
+      "Confirm no visible image on the screen even after adjusting brightness."
+    ],
+    "steps": [
+      "Ask the crew to power the Getac off if possible.",
+      "Ask them to remove both batteries at the same time to fully remove power from the device.",
+      "After a short pause, ask them to reinsert both batteries.",
+      "Ensure the battery flaps are fully closed on both sides with no gaps.",
+      "Ask them to power the device back on and confirm if the screen now displays normally."
+    ],
+    "important_notes": [
+      "This procedure fully power-cycles the Getac and often resolves display lockups.",
+      "Battery flaps not closing properly can also affect brightness and display behaviour."
+    ],
+    "escalation": [
+      "If the screen is still black after a full power cycle, log the device for swap-out as a likely hardware failure."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 15: Lights on Getac but screen black"
+    ]
+  },
+  {
+    "id": "KB-004",
+    "category": "Hardware",
+    "subcategory": "Docking / not charging on dock",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Troubleshoot a Getac that is not charging or powering on when placed in a vehicle dock.",
+    "triggers": [
+      "Getac not charging on dock",
+      "No lights when docked",
+      "Getac power issue on vehicle dock"
+    ],
+    "prechecks": [
+      "Confirm the vehicle ignition is switched on.",
+      "Ask if the crew can see a green LED lit on the power pack at the rear of the dock."
+    ],
+    "steps": [
+      "Ask the crew to ensure the Getac is closed before docking.",
+      "Ask them to seat the Getac on the lower dock hooks and then push it firmly against the back plate of the dock.",
+      "Wait 1–2 seconds to see if the charging LED on the Getac illuminates before closing the retaining clip.",
+      "If the LED does not light, ask them to slightly move the Getac up against the dock back plate to help it align with the locating pins.",
+      "If possible, ask them to try the same Getac on another known-good dock in a different vehicle.",
+      "If the Getac charges on another dock, the original dock is faulty.",
+      "If the Getac does not charge on any dock, treat the Getac as the likely fault."
+    ],
+    "important_notes": [
+      "New style Getac devices will only dock into the newer dock design; they are not compatible with old-style docks.",
+      "Until the hardware is fixed, the crew should use paper documentation and inform their Clinical Supervisor."
+    ],
+    "escalation": [
+      "If the dock is faulty: advise the crew to use paper, inform the Clinical Supervisor, arrange for the vehicle to attend Fleet, log a ticket with call sign and station, and email the Fleet and Estates helpdesk with details.",
+      "If the Getac itself is faulty across multiple docks: add the device to the swap-out process."
+    ],
+    "source": [
+      "Getac Service Desk Doc – Dock issue",
+      "Guide for ePR oncall – Section 17: Dock issue"
+    ]
+  },
+  {
+    "id": "KB-010",
+    "category": "Application",
+    "subcategory": "ePR not displaying / ALT+TAB warning boxes",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Handle cases where ePR is not visible or appears to crash on finalising due to hidden warning boxes.",
+    "triggers": [
+      "ePR has disappeared",
+      "ePR crashed after finalising",
+      "Finalise then crash on relaunch",
+      "ePR not displaying on screen"
+    ],
+    "prechecks": [
+      "Confirm the crew can still see the Windows launcher or desktop.",
+      "Confirm whether the crash happens when they click 'relaunch ePR' after finalising."
+    ],
+    "steps": [
+      "Ask the crew to press ALT + TAB to cycle through open windows.",
+      "If any ePR warning boxes are visible, ask them to click 'OK' on each one until they are all closed.",
+      "Explain that these warning boxes cause ePR to crash when finalising and relaunching.",
+      "If there are multiple warning boxes or you cannot remote in to help, ask the crew to restart the Getac to clear any stuck processes."
+    ],
+    "important_notes": [
+      "Finalising of the ePR record itself typically still completes; the crash affects the relaunch step.",
+      "ALT+TAB warning boxes usually appear when ePR is already open and the crew click the ePR button on the launcher again, or when a previous crash did not close cleanly."
+    ],
+    "escalation": [
+      "If ePR continues to crash after clearing warning boxes and a full restart, consider recreating the local database and investigate further."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 2: ePR not displaying - ALT and TAB"
+    ]
+  },
+  {
+    "id": "KB-011",
+    "category": "Application",
+    "subcategory": "ePR running slow – recreate local database",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Improve performance by recreating the local ePR database on a Getac.",
+    "triggers": [
+      "ePR very slow",
+      "Performance issues",
+      "Delay when navigating ePR screens"
+    ],
+    "prechecks": [
+      "Confirm that the crew have completed and finalised any ePRs they need on this device.",
+      "Confirm that the ePR client is fully closed on the device.",
+      "Explain that recreating the database means they will not be able to access any in-progress ePR that has not been finalised."
+    ],
+    "steps": [
+      "From your machine, open File Explorer and connect to the device using \\\\getacname\\C$ or \\\\IPaddress\\C$.",
+      "Navigate to 'Users' > 'EPR' > 'AppData'.",
+      "If 'AppData' is not visible, enable 'Hidden items' in the View menu.",
+      "Go to 'Local' > 'Apps' > '2.0'.",
+      "Open the non-'data' folder with the 'strange name', then open the most recent 'epr...tion' folder.",
+      "Open the 'DataOp' folder.",
+      "Locate 'ePCRLocalV1.db3' and rename it to '_ePCRLocalV1.db3'.",
+      "Confirm that any 'ePCRLocalV1.db3-shm' or 'ePCRLocalV1.db3-wal' files are not present or indicate that ePR is closed.",
+      "Ask the crew to relaunch ePR from the launcher. A new database will be created automatically."
+    ],
+    "important_notes": [
+      "Folders beginning 'ePCRLocalV1-<number>-GUID-BAK' are historical databases for individual ePRs once data has synced to the server.",
+      "The 'ePCRLocalLookups' file controls local lookups such as crew data, hospital destinations, departments, drug names and routes.",
+      "If the ePCRLocalLookups file is unusually small or missing, it can prevent certain data from populating in the client; replacing it with a known-good copy can help.",
+      "Never open the live database while ePR is running as this can lock the client and create audit exceptions; copy it elsewhere for viewing if necessary."
+    ],
+    "escalation": [
+      "If recreating the database does not improve performance, consider recreating the full local EPR profile on the device.",
+      "If problems persist after profile recreation, log for rebuild or further 2nd line investigation."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 13: Recreate a database / ePR running slow"
+    ]
+  },
+  {
+    "id": "KB-012",
+    "category": "Application",
+    "subcategory": "Recreate EPR local profile",
+    "audience": [
+      "ePR On-call",
+      "2nd Line"
+    ],
+    "summary": "Recreate the full EPR local Windows profile on a Getac when performance issues persist after recreating the database.",
+    "triggers": [
+      "ePR still running slow after database recreation",
+      "Corrupt local EPR profile suspected"
+    ],
+    "prechecks": [
+      "Confirm that recreating the local database has already been attempted.",
+      "Ensure that the caller understands this is an advanced action and that the configuration steps will be required afterwards."
+    ],
+    "steps": [
+      "On the EPR launcher, click 'Restart' and then 'No' so 'Restart' is highlighted.",
+      "Press and hold ALT, then press F11 to reveal the Windows taskbar.",
+      "Open the Start menu and sign out of the EPR local account.",
+      "Sign into an admin account (e.g. 'administrator' or other IT admin account).",
+      "Open 'This PC' properties and select 'Advanced system settings'.",
+      "Under the 'Advanced' tab, in 'User Profiles', click 'Settings'.",
+      "Select the '/EPR' user profile and click 'Delete'.",
+      "Restart the Getac until it logs back into the EPR local account (this may take several reboots).",
+      "Once logged in as EPR local, reinstall the relevant EPR client (e.g. Live) using the appropriate installer link.",
+      "Clean up the UI: remove pinned apps from the taskbar, adjust quick actions to only show Network, unpin unnecessary Start menu tiles, disable the touchscreen keyboard auto-popup, and hide desktop icons as per standard build.",
+      "Check and enable spellcheck following the spellcheck procedure if required."
+    ],
+    "important_notes": [
+      "This action effectively recreates the EPR local Windows profile and should only be performed by appropriate support staff.",
+      "After profile recreation, the device needs to be reconfigured to match the standard YAS EPR build."
+    ],
+    "escalation": [
+      "If performance or profile issues persist after recreation, log the device for a full rebuild or escalated 2nd line investigation."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 14: Recreate a profile – ePR running slow after database recreated"
+    ]
+  },
+  {
+    "id": "KB-020",
+    "category": "Clinical record",
+    "subcategory": "Amendments – missing / incorrect details",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Process when crews realise they have forgotten to add information or need to correct details on an ePR.",
+    "triggers": [
+      "Crew forgot to enter some information",
+      "Need to correct details on the ePR",
+      "Amendment request"
+    ],
+    "prechecks": [
+      "Confirm whether the ePR is an accepted transfer or not.",
+      "Obtain the incident number and PCRID."
+    ],
+    "steps": [
+      "If the record is an accepted transfer:",
+      "  - Ask the crew to email yas.epramendments@nhs.net including the incident number, PCRID and the details that need amending.",
+      "  - Remind the crew to inform the receiving hospital of any changes and to log a Datix if appropriate.",
+      "If the ePR is NOT a transfer:",
+      "  - Ask the crew to create a second ePR using the same incident number while you are on the call so you can see it on the admin portal.",
+      "  - They must complete the Incident screen, Patient screen and Patient Outcome screen.",
+      "  - If the patient was transported, the original ePR will already contain pre-alert and handover details; in the new ePR they can select 'Pre-alert not required' and self-handover to allow finalisation.",
+      "  - Once the second ePR is complete, link the first and second records together using the standard linking process."
+    ],
+    "important_notes": [
+      "The linking process makes both records visible at the hospital and ensures a complete combined record.",
+      "Always make sure the correct records are being linked by confirming patient details."
+    ],
+    "escalation": [
+      "If there is any uncertainty about which records belong to which patient, do not link and escalate to the systems team for review."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 4: ePR Amendments – missing / incorrect details on ePR"
+    ]
+  },
+  {
+    "id": "KB-021",
+    "category": "Clinical record",
+    "subcategory": "Linking two ePRs (failed transfer or amendment)",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Link multiple ePRs for the same patient and incident when transfers fail or amendments have been created.",
+    "triggers": [
+      "Transfer failed",
+      "Two ePRs for the same incident",
+      "Need to link amendment record to original"
+    ],
+    "prechecks": [
+      "Obtain the incident number.",
+      "Confirm that both ePRs relate to the same patient by checking name and callsign.",
+      "Check the status of both records in the ePR Viewer."
+    ],
+    "steps": [
+      "Open the ePR Admin portal at http://swkyasiis03.yas.nhs.uk/Live/ePRAdmin/.",
+      "From the menu, select 'ePR viewer' and then 'ePR Viewer'.",
+      "Search using the incident number.",
+      "Identify the records for the same patient (check name and callsign).",
+      "Check the 'Status' column. If one record is 'Transferred – Waiting' and the other is 'In progress' or 'Finalised', they require linking.",
+      "Note both PCRIDs, identifying which is the first record (earliest) and which is the second (latest).",
+      "From the menu, select 'Administration' then 'Link record'.",
+      "Enter the first PCRID in the top box and the second PCRID in the bottom box, then click 'Link records'.",
+      "Confirm that a message appears confirming the records are now linked.",
+      "Return to the ePR Viewer and re-search the incident to confirm that the first ePR now shows as 'Transferred' and the second shows an appropriate accepted transfer status."
+    ],
+    "important_notes": [
+      "Linking records makes them immediately visible on the hospital portal, so it is critical that only correct matches are linked.",
+      "Patient name or incident numbers may contain minor errors, so always confirm details with the crew if unsure."
+    ],
+    "escalation": [
+      "If there is any uncertainty about record ownership or linking fails repeatedly, escalate to the systems team."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 5: Linking ePRs (failed transfers or amendments)"
+    ]
+  },
+  {
+    "id": "KB-022",
+    "category": "Clinical record",
+    "subcategory": "Un-transfer an ePR (2nd crew have no Getac)",
+    "audience": [
+      "ePR On-call"
+    ],
+    "summary": "Un-transfer an ePR so it can be finalised and assigned directly to a hospital when the second crew have no Getac device.",
+    "triggers": [
+      "Second crew have no Getac",
+      "Need record sending to hospital without second crew editing",
+      "Un-transfer request"
+    ],
+    "prechecks": [
+      "Confirm why the second crew cannot complete their own ePR (e.g. no device, swap-out, private provider).",
+      "Advise that the preferred approach is for the attending crew to complete an ePR for handover.",
+      "Record details on the on-call sheet for audit (incident number, PCRID, reason)."
+    ],
+    "steps": [
+      "Open the ePR Admin portal at http://swkyasiis03.yas.nhs.uk/Live/ePRAdmin/.",
+      "Open 'ePR viewer' and then 'ePR Viewer'.",
+      "Search for the incident number and locate the transfer record that shows 'Transferred – waiting'.",
+      "Note the PCRID of this record.",
+      "Go to 'Administration' then 'Link record'.",
+      "In the first box, enter the PCRID of the record to be un-transferred.",
+      "In the second box, enter '0'.",
+      "Click 'Link records'.",
+      "Confirm that the success message appears.",
+      "Return to the ePR Viewer and check that the record now shows as 'In progress'.",
+      "Go to 'Administration' > 'ePR Admin', search by Incident or PCRID, and click 'Finalise'.",
+      "Select an appropriate reason for finalisation and click 'Finalise PCR'.",
+      "Once finalised, click 'Assign', select the correct destination hospital and reason, and click 'Assign PCR'."
+    ],
+    "important_notes": [
+      "Un-transferring and finalising an ePR without second crew input should be the exception, not the routine process.",
+      "All such actions should be clearly documented for audit."
+    ],
+    "escalation": [
+      "If finalisation or assignment fails consistently despite browser restarts, escalate to the systems team."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 6: Un-transfer an ePR (2nd crew have no Getac)"
+    ]
+  },
+  {
+    "id": "KB-023",
+    "category": "Clinical record",
+    "subcategory": "Unable to finalise refusal record",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Resolve cases where a crew cannot finalise an ePR after documenting a patient refusal.",
+    "triggers": [
+      "Patient refused but record will not finalise",
+      "Refusal documented but 'Finalise' button not available"
+    ],
+    "prechecks": [
+      "Confirm the crew are dealing with a refusal scenario.",
+      "Ask which sections of the Patient Outcome screen they have completed."
+    ],
+    "steps": [
+      "Explain that marking refusal only against 'Examination' is not enough for finalisation.",
+      "Ask the crew to open the Patient Outcome section.",
+      "Check that the Patient Outcome screen is fully completed, including whether the patient was transported or not.",
+      "Ask them to select 'Transfer to hospital / treatment centre' in the outcome options. For refusal cases this will automatically mark the record as 'Not transported'.",
+      "Ensure all mandatory fields are complete.",
+      "Ask them to attempt to finalise the record again."
+    ],
+    "important_notes": [
+      "The system is designed so that refusal can coexist with potential transport, which is why the outcome must still be set.",
+      "Once outcome and mandatory fields are complete, finalisation should be possible."
+    ],
+    "escalation": [
+      "If finalisation still fails despite all sections being complete, consider finalising via the Admin Portal after confirming all checks, or escalate to systems."
+    ],
+    "source": [
+      "Getac Service Desk Doc – Unable to finalise record when patient has refused"
+    ]
+  },
+  {
+    "id": "KB-024",
+    "category": "Clinical record",
+    "subcategory": "Finalising an ePR via Admin Portal",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Use the Admin Portal to finalise an ePR when the crew cannot, after confirming all necessary sections are complete.",
+    "triggers": [
+      "Crew unable to finalise despite completing everything",
+      "Request to finalise via admin portal"
+    ],
+    "prechecks": [
+      "Confirm that the Patient Outcome section is fully completed, including transport status and working impression.",
+      "For transported patients, confirm that the Pre-alert / Hospital handover screen is completed.",
+      "Check whether any electronic referrals (Social Care, Safeguarding adult/child) are started but not submitted; these must be submitted or cancelled."
+    ],
+    "steps": [
+      "Open the ePR Admin portal at http://swkyasiis03.yas.nhs.uk/Live/ePRAdmin/.",
+      "From 'Administration', select 'ePR Admin'.",
+      "Search using the Incident number or PCRID and confirm the correct record has been located.",
+      "Click the 'Finalise' button.",
+      "Choose an appropriate reason from the 'Specify reason' dropdown.",
+      "Click 'Finalise PCR'.",
+      "Check for a success message indicating the record has been finalised."
+    ],
+    "important_notes": [
+      "Do NOT finalise an ePR simply because a hospital phones and requests it. There can be unsynced data, and doing so may create conflicting versions of the truth.",
+      "Always check that all sections are appropriately complete before finalising on behalf of the crew."
+    ],
+    "escalation": [
+      "If finalisation fails more than once, try closing and reopening the browser and repeating the steps.",
+      "If issues persist, escalate to the systems team."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 7: Finalising an ePR – CREW ONLY",
+      "Guide for ePR oncall – Section 21: Hospitals requesting ePRs to be finalised"
+    ]
+  },
+  {
+    "id": "KB-025",
+    "category": "Clinical record",
+    "subcategory": "Cancelling an ePR via Admin Portal",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Cancel an ePR via the Admin Portal when requested by a crew and it is safe to do so.",
+    "triggers": [
+      "Crew request to cancel an ePR",
+      "ePR started in error"
+    ],
+    "prechecks": [
+      "Check whether the ePR contains a submitted Electronic Referral (Social Care Assessment, Safeguarding Adult, Safeguarding Child).",
+      "If there is a submitted referral, the crew should complete, not cancel, the ePR."
+    ],
+    "steps": [
+      "Open the ePR Admin portal at http://swkyasiis03.yas.nhs.uk/Live/ePRAdmin/.",
+      "From 'Administration', select 'ePR Admin'.",
+      "Search using the Incident number or PCRID and confirm the correct record.",
+      "Click the 'Cancel' button.",
+      "Choose an appropriate reason from the 'Specify reason' dropdown.",
+      "Click 'Cancel PCR'.",
+      "Check for a success message indicating the record has been cancelled."
+    ],
+    "important_notes": [
+      "An ePR should not be cancelled at the request of a hospital; this process is crew-driven and must respect safeguarding and referral processes."
+    ],
+    "escalation": [
+      "If cancellation fails after retrying, escalate to the systems team."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 8: Cancelling an ePR – CREW ONLY"
+    ]
+  },
+  {
+    "id": "KB-026",
+    "category": "Portal",
+    "subcategory": "Create new hospital user for ePR dashboard",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Create a new hospital user account for the ePR hospital dashboard.",
+    "triggers": [
+      "New hospital staff member needs ePR dashboard access",
+      "Request to create hospital portal user"
+    ],
+    "prechecks": [
+      "Confirm the caller is authorised to request a new account for their hospital.",
+      "Identify the correct hospital site code."
+    ],
+    "steps": [
+      "Open the ePR Admin portal at http://swkyasiis03/Live/ePRAdmin/.",
+      "From the main menu, click 'Administration', then 'User Administration'.",
+      "Click 'Add User' to create a new account.",
+      "Enter the Forename and Surname.",
+      "Enter a User ID, typically in the format firstname.surname, following existing naming conventions for that hospital.",
+      "Enter the email address if available.",
+      "Set the Site Name using the appropriate hospital code (e.g. LGI, STJ, YDH, etc.).",
+      "Tick the EPCR checkbox.",
+      "Set the initial password according to local policy (commonly 'Yasepr1' unless policy has changed).",
+      "Save the new user and arrange for the credentials to be sent securely to the hospital contact."
+    ],
+    "important_notes": [
+      "Site Name must match one of the configured hospital codes for access to work correctly.",
+      "Passwords and account details should be sent using secure, approved communication channels only."
+    ],
+    "escalation": [
+      "If the site code is missing or invalid, escalate to systems for configuration.",
+      "If user creation fails, capture any error messages and escalate."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 18: Create new users for hospitals"
+    ]
+  },
+  {
+    "id": "KB-027",
+    "category": "Portal",
+    "subcategory": "New ePCR portal user – non-YAS (self-service)",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Add a new non-YAS user to the ePCR portal using the self-service process.",
+    "triggers": [
+      "Hospital staff require ePCR portal access",
+      "Non-YAS portal account creation"
+    ],
+    "prechecks": [
+      "Confirm the requester is authorised for that hospital/site.",
+      "Determine the correct hospital site code from the site list."
+    ],
+    "steps": [
+      "Open the EPR admin portal at http://epradminlive.yas.nhs.uk/.",
+      "Click 'Administration', then 'Add User'.",
+      "Enter the user's first name and last name.",
+      "Enter the user's email address.",
+      "Define a username based on the format used for that hospital (check existing accounts for consistency).",
+      "Enter the appropriate site code from the site list (e.g. LGI, STJ, YDH, etc.).",
+      "Generate a strong password using an approved password generator and enter it.",
+      "Select the roles the user needs. For standard hospital A&E staff, select 'Dashboard Queues' and 'Search / View EPR'.",
+      "Click 'Add User' to create the account.",
+      "Send the username and password to the user via an approved secure method."
+    ],
+    "important_notes": [
+      "Usernames and site codes must follow local conventions to avoid confusion and access issues.",
+      "The chosen roles must align with the user’s responsibilities and least-privilege principles."
+    ],
+    "escalation": [
+      "If the system rejects the site code or user creation fails, escalate to the systems team with full details."
+    ],
+    "source": [
+      "New User account process for ePCR Portal for non-YAS users",
+      "ePCR Portal Password reset for non-YAS users"
+    ]
+  },
+  {
+    "id": "KB-028",
+    "category": "Portal",
+    "subcategory": "Reset password for non-YAS portal user",
+    "audience": [
+      "Service Desk"
+    ],
+    "summary": "Reset the password for an existing non-YAS ePCR portal user.",
+    "triggers": [
+      "Non-YAS portal user has forgotten password",
+      "Account still active but password reset required"
+    ],
+    "prechecks": [
+      "Confirm the identity and authorisation of the requester.",
+      "Confirm the account is for a non-YAS hospital user."
+    ],
+    "steps": [
+      "Open the ePR Admin portal at http://epradminlive.yas.nhs.uk/.",
+      "Click 'Administration' and then 'Manage Users'.",
+      "Filter by hospital using the drop-down and click 'Filter by hospital'.",
+      "Filter by username using the relevant drop-down and click 'Filter by username'.",
+      "Locate the user's account and click 'Edit'.",
+      "Click the 'Change Password' button.",
+      "Generate a new strong password using an approved password generator.",
+      "Enter the new password and save the changes.",
+      "Send the new password to the user via an approved secure method."
+    ],
+    "important_notes": [
+      "Ensure you are resetting the correct user account, especially where naming conventions are similar.",
+      "Do not send passwords via insecure channels."
+    ],
+    "escalation": [
+      "If the user cannot be found or the change fails, escalate to the systems team for further investigation."
+    ],
+    "source": [
+      "ePCR Portal Password reset for non-YAS users"
+    ]
+  },
+  {
+    "id": "KB-029",
+    "category": "Portal",
+    "subcategory": "Universal Receipt (UR) access",
+    "audience": [
+      "Hospital staff",
+      "Service Desk"
+    ],
+    "summary": "Access an ePR via the Universal Receipt portal using the three passcodes provided by the crew.",
+    "triggers": [
+      "Hospital has three passcodes from crew",
+      "Need to view ePR quickly without full portal login"
+    ],
+    "prechecks": [
+      "Confirm the hospital staff member has three passcodes from the crew.",
+      "Confirm the passcodes were generated within the last 24 hours."
+    ],
+    "steps": [
+      "Ask the hospital user to go to https://eprweb.yas.nhs.uk/Live/dashv3/ur.",
+      "On the Universal Receipt page, ask them to enter the three passcodes provided by the ambulance crew.",
+      "Submit the passcodes to retrieve the associated ePR information."
+    ],
+    "important_notes": [
+      "Universal Receipt passcodes are unique to the job and only valid for 24 hours from generation in the Patient Outcome screen.",
+      "This method does not require a named user account for access."
+    ],
+    "escalation": [
+      "If the passcodes do not work and are confirmed correct and in-date, escalate to the systems team with incident details."
+    ],
+    "source": [
+      "Universal Receipt – How to access universal receipt"
+    ]
+  },
+  {
+    "id": "KB-030",
+    "category": "Application",
+    "subcategory": "Spellcheck not working on Getac",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Fix spellcheck issues on the Getac ePR device by adjusting language settings.",
+    "triggers": [
+      "Red underline not appearing under misspelled words",
+      "Spellcheck not working in ePR"
+    ],
+    "prechecks": [
+      "Confirm the issue is with spellcheck and not general text entry.",
+      "Ensure the device is logged into the local EPR account."
+    ],
+    "steps": [
+      "Ask the crew to power on the Getac and log into the local EPR account.",
+      "On the launcher screen, click 'Restart' and then 'No' so the restart button is highlighted.",
+      "Ask them to press ALT + F11 to show the Windows taskbar.",
+      "Ask them to open the Start menu and search for 'Settings'.",
+      "In Settings, go to 'Time & Language' then 'Language & keyboard options'.",
+      "Add a preferred language and choose 'English (United States)'.",
+      "Click 'Next' and then 'Install' (they do not need to set it as display language).",
+      "Wait for the US language pack to install; a red status text may appear while it installs.",
+      "Once installed, test spellcheck by typing a test word such as 'epr ' and checking for the red underline after a space.",
+      "If English (United States) has become the display language and the keyboard layout is now US (\" and @ swapped), remove the English (United States) language pack, restart the Getac, then reinstall it ensuring UK remains the display/keyboard language."
+    ],
+    "important_notes": [
+      "The aim is to enable spellcheck functionality without permanently switching the keyboard to a US layout.",
+      "Crew may need guidance to avoid accidentally making US the display language."
+    ],
+    "escalation": [
+      "If spellcheck still does not work after this procedure, recreate the local profile or escalate to systems."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 31: Spellcheck issues",
+      "Getac Service Desk Doc – Spellchecker"
+    ]
+  },
+  {
+    "id": "KB-031",
+    "category": "Application",
+    "subcategory": "Screen resolution incorrect (parts of ePR missing)",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Correct the screen resolution on a Getac when parts of the ePR or launcher are missing or misaligned.",
+    "triggers": [
+      "Parts of ePR not visible",
+      "Cannot see handover destination or signature boxes",
+      "Launcher appears cropped or misaligned"
+    ],
+    "prechecks": [
+      "Confirm the device is a Getac with ePR installed.",
+      "Confirm the user is reporting missing UI elements rather than data issues."
+    ],
+    "steps": [
+      "Explain that ePR is designed to display at 1366 x 768 resolution and higher resolutions can hide elements.",
+      "On the launcher, click 'Restart' and then 'No' so restart is highlighted.",
+      "Ask the user to press and hold ALT, then press F11 to reveal the Windows taskbar.",
+      "Right-click the taskbar and choose to show the desktop.",
+      "Right-click on the desktop and select 'Display settings'.",
+      "In Display settings, select the resolution 1366 x 768 from the dropdown.",
+      "Apply the new resolution.",
+      "Restart the Getac. If the crew are in an ePR at the time, ask them to save first and then use crash recovery after reboot to avoid losing data."
+    ],
+    "important_notes": [
+      "Windows may recommend 1920 x 1080, but ePR is built for 1366 x 768 to ensure all controls are visible.",
+      "Changing resolution may temporarily affect layout until rebooted."
+    ],
+    "escalation": [
+      "If resolution repeatedly changes or cannot be set to 1366 x 768, log the device for further investigation."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 20: Screen resolution"
+    ]
+  },
+  {
+    "id": "KB-032",
+    "category": "Application",
+    "subcategory": "Safeguarding referral not submitting",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Troubleshoot safeguarding or social care referrals that will not submit from within ePR.",
+    "triggers": [
+      "Safeguarding referral won’t submit",
+      "Social Care Assessment referral stuck",
+      "Submit to clinical hub not working"
+    ],
+    "prechecks": [
+      "Confirm the crew have connectivity and are not connected to GovRoam.",
+      "Confirm which type of referral they are completing (Safeguarding adult, Safeguarding child, Social care assessment)."
+    ],
+    "steps": [
+      "Ask the crew to check all mandatory fields in the referral. Incomplete mandatory sections are shown in pink; all sections should be grey or green.",
+      "Ensure sections such as GP, Risks and other mandatory details are populated.",
+      "If all mandatory fields are complete and it still will not submit:",
+      "  - Remote onto the Getac (e.g. via DameWare) and note the referral type and the PCRID from the section selector.",
+      "  - Task manager the ePR client to close it down.",
+      "  - Connect to the device C drive (\\\\getacname\\C$) and copy 'ePCRLocalV1' to your own machine.",
+      "  - Open 'ePCRLocalV1' using SQLite on your machine and go to 'Browse Data'.",
+      "  - In the table dropdown, choose the appropriate table:",
+      "      * 'PatientOutcomeSga' for Safeguarding Adult",
+      "      * 'PatientOutcomeSgc' for Safeguarding Child",
+      "      * 'PatientOutcomeSca' for Social Care Assessment",
+      "  - Locate the relevant row where PCRID is '0' and update the PCRID field to the correct PCRID.",
+      "  - Click 'Apply' and 'Write changes'.",
+      "  - Close SQLite and copy the updated local database back to the Getac C drive, overwriting the existing file.",
+      "  - Ask the crew to reopen the ePR client, navigate back to the referral and attempt to submit again."
+    ],
+    "important_notes": [
+      "This issue can occur when the referral record in the local database does not have the correct PCRID.",
+      "Always ensure ePR is closed before editing the local database, and work on a copy rather than the live file where possible."
+    ],
+    "escalation": [
+      "If the referral still does not submit after correcting the PCRID and connectivity is confirmed, escalate to the systems team."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 28: Safeguarding referral not submitting"
+    ]
+  },
+  {
+    "id": "KB-033",
+    "category": "Integration",
+    "subcategory": "CAD downtime behaviour",
+    "audience": [
+      "Service Desk",
+      "ePR On-call",
+      "Crews"
+    ],
+    "summary": "Describe how crews should manage ePR documentation when CAD is down and incident details do not pull through.",
+    "triggers": [
+      "CAD offline",
+      "Incident details not pulling into ePR",
+      "EOC on paper"
+    ],
+    "prechecks": [
+      "Confirm there is known or suspected CAD downtime.",
+      "Confirm the crew understands that CAD-linked population of incident data will not work."
+    ],
+    "steps": [
+      "Advise crews not to revert to paper purely because CAD is down; they should continue to use ePR.",
+      "Ask crews to manually enter Incident and Patient details in the ePR, as they would if they had no connectivity.",
+      "Explain that when EOC are on paper, the incident number format is Day, Month and a three-digit number from EOC.",
+      "Example: if CAD is down on 3rd September and the incident number is 001, the incident number should be entered as 0309001."
+    ],
+    "important_notes": [
+      "Manual entry during CAD downtime ensures continuity of ePR use and electronic data capture.",
+      "Crew should be made aware of the correct incident number format to avoid confusion."
+    ],
+    "escalation": [
+      "If CAD downtime behaviour appears inconsistent or multiple crews cannot work as described, confirm with EOC and IT whether there are wider issues."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 34: CAD downtime"
+    ]
+  },
+  {
+    "id": "KB-034",
+    "category": "Application",
+    "subcategory": "NHS number search issues",
+    "audience": [
+      "Service Desk",
+      "ePR On-call"
+    ],
+    "summary": "Troubleshoot issues where the NHS number search in ePR does not return expected results.",
+    "triggers": [
+      "NHS number search not returning results",
+      "Crew believes NHS number search is broken"
+    ],
+    "prechecks": [
+      "Confirm the crew have connectivity; NHS number search relies on a third-party service.",
+      "Ask the crew to confirm that all required fields for the search are being completed."
+    ],
+    "steps": [
+      "Remind the crew that all details in the NHS number search panel must be completed.",
+      "Ensure there are no trailing spaces at the end of names.",
+      "Ensure the postcode has a space in the correct place (e.g. 'WF8 2DH').",
+      "Ask the crew to retry the search after correcting any formatting issues.",
+      "If they still report no results, advise them to continue completing the ePR as normal and note any NHS number if obtained later.",
+      "If you want to test the service, use a test call on ePR Live with your own details, ensuring the ePR is then cancelled.",
+      "If repeated tests with known-good data fail to return results over time, escalate to the systems team."
+    ],
+    "important_notes": [
+      "NHS number search is a third-party integration; connectivity is essential.",
+      "Input formatting errors (spaces, missing fields) commonly cause failed searches."
+    ],
+    "escalation": [
+      "If multiple users report similar issues and tests confirm a problem, escalate to systems with times, user details and test examples."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 33: NHS number search"
+    ]
+  },
+  {
+    "id": "KB-035",
+    "category": "Device management",
+    "subcategory": "Tracking a missing Getac with Absolute Software",
+    "audience": [
+      "ePR On-call",
+      "2nd Line",
+      "Security"
+    ],
+    "summary": "Use Absolute Software to track the last known location of a Getac device.",
+    "triggers": [
+      "Getac reported lost, stolen or missing",
+      "Need to track device location"
+    ],
+    "prechecks": [
+      "Obtain the full Getac device name (e.g. GTCTX08190).",
+      "Confirm the device has been powered on for at least 15 minutes recently, if possible."
+    ],
+    "steps": [
+      "Access the Absolute tracking portal at https://signin.absolute.com/ using your credentials.",
+      "Once signed in, go to 'Reports' on the left-hand side.",
+      "Select the 'Last known location' report.",
+      "Accept any geolocation tracking agreement presented.",
+      "In the filters, choose 'All devices' and set the field to 'Device name'.",
+      "Enter the full Getac name in the field or choose it from the device list.",
+      "Click 'Show results'.",
+      "Review the map to see the device's last known location."
+    ],
+    "important_notes": [
+      "The device must have been powered on and connected long enough for a location ping; otherwise only the last known location will be shown.",
+      "Location data should be handled according to local information governance and security policies."
+    ],
+    "escalation": [
+      "If the device cannot be located or is confirmed stolen, follow local security incident and data protection procedures."
+    ],
+    "source": [
+      "Guide for ePR oncall – Section 30: Absolute Software"
+    ]
+  },
+  {
+    "id": "KB-036",
+    "category": "Hardware",
+    "subcategory": "Touchscreen not responding",
+    "summary": "Troubleshoot Getac touchscreen that stops responding."
+  },
+  {
+    "id": "KB-037",
+    "category": "Hardware",
+    "subcategory": "Stylus not working",
+    "summary": "Troubleshoot stylus issues."
+  },
+  {
+    "id": "KB-038",
+    "category": "Hardware",
+    "subcategory": "No power",
+    "summary": "Getac shows no signs of power."
+  },
+  {
+    "id": "KB-039",
+    "category": "Hardware",
+    "subcategory": "BIOS loop",
+    "summary": "Getac stuck in BIOS."
+  },
+  {
+    "id": "KB-040",
+    "category": "Hardware",
+    "subcategory": "Battery drain",
+    "summary": "Battery drains very quickly."
+  },
+  {
+    "id": "KB-041",
+    "category": "Application",
+    "subcategory": "Launcher missing icons",
+    "summary": "Restore missing launcher icons."
+  },
+  {
+    "id": "KB-042",
+    "category": "Application",
+    "subcategory": "Client not launching",
+    "summary": "ePR fails to start."
+  },
+  {
+    "id": "KB-043",
+    "category": "Application",
+    "subcategory": "Crash recovery",
+    "summary": "Guide to crash recovery."
+  },
+  {
+    "id": "KB-044",
+    "category": "Application",
+    "subcategory": "Mandatory fields",
+    "summary": "Fix missing mandatory alerts."
+  },
+  {
+    "id": "KB-045",
+    "category": "Admin Portal",
+    "subcategory": "Search tips",
+    "summary": "Improve search accuracy."
+  },
+  {
+    "id": "KB-046",
+    "category": "Admin Portal",
+    "subcategory": "Activity log",
+    "summary": "Use activity log."
+  },
+  {
+    "id": "KB-047",
+    "category": "Admin Portal",
+    "subcategory": "Portal errors",
+    "summary": "Common portal errors."
+  },
+  {
+    "id": "KB-048",
+    "category": "Hospital Portal",
+    "subcategory": "Queue visibility",
+    "summary": "Fix missing queues."
+  },
+  {
+    "id": "KB-049",
+    "category": "Hospital Portal",
+    "subcategory": "PDF issues",
+    "summary": "Fix PDF issues."
+  },
+  {
+    "id": "KB-050",
+    "category": "Hospital Portal",
+    "subcategory": "Record not found",
+    "summary": "Troubleshoot missing records."
+  },
+  {
+    "id": "KB-051",
+    "category": "Training",
+    "subcategory": "Training not loading",
+    "summary": "Fix training mode."
+  },
+  {
+    "id": "KB-052",
+    "category": "Training",
+    "subcategory": "Live used accidentally",
+    "summary": "Actions when crew practice on Live."
+  },
+  {
+    "id": "KB-053",
+    "category": "Referral",
+    "subcategory": "Mental health referral",
+    "summary": "Troubleshoot referral issues."
+  },
+  {
+    "id": "KB-054",
+    "category": "Referral",
+    "subcategory": "Duplicate referrals",
+    "summary": "Fix duplicate referrals."
+  },
+  {
+    "id": "KB-055",
+    "category": "CAD Integration",
+    "subcategory": "Duplicate incidents",
+    "summary": "Resolve duplicate CAD incidents."
+  },
+  {
+    "id": "KB-056",
+    "category": "CAD Integration",
+    "subcategory": "CAD updates missing",
+    "summary": "Fix CAD updates not appearing."
+  },
+  {
+    "id": "KB-057",
+    "category": "Governance",
+    "subcategory": "Paper PRF rules",
+    "summary": "When to use paper PRFs."
+  },
+  {
+    "id": "KB-058",
+    "category": "Governance",
+    "subcategory": "Incomplete ePR",
+    "summary": "Handle abandoned ePRs."
+  },
+  {
+    "id": "KB-059",
+    "category": "Governance",
+    "subcategory": "Audit sheet",
+    "summary": "Required audit fields."
+  }
+]
