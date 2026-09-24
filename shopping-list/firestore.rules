@@ -1,5 +1,5 @@
 rules_version = '2';
-service cloud_firestore {
+service cloud.firestore {
   match /databases/{database}/documents {
     // Each list lives at /lists/{code}. Only someone who knows the 10-character
     // code can open it, and nobody can browse the list of all lists.
