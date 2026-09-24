@@ -1,14 +1,10 @@
-// Paste your Firebase web config here (see README.md, step 1).
-// While this is left as null, the app runs in "this phone only" demo mode
-// and nothing is shared.
-export const firebaseConfig = null;
-
-// Example of what it should look like once filled in:
-// export const firebaseConfig = {
-//   apiKey: "AIza...",
-//   authDomain: "our-shopping-list.firebaseapp.com",
-//   projectId: "our-shopping-list",
-//   storageBucket: "our-shopping-list.appspot.com",
-//   messagingSenderId: "1234567890",
-//   appId: "1:1234567890:web:abc123",
-// };
+// Firebase web config for the our-shopping-list project.
+// These values are meant to be public; access is controlled by firestore.rules.
+export const firebaseConfig = {
+  apiKey: "AIzaSyDEEu_x96-Nia-Qlfn-Y8iO54BWw4B5BeU",
+  authDomain: "our-shopping-list-4043b.firebaseapp.com",
+  projectId: "our-shopping-list-4043b",
+  storageBucket: "our-shopping-list-4043b.firebasestorage.app",
+  messagingSenderId: "296280632486",
+  appId: "1:296280632486:web:1e6fabb60019ab305ed867",
+};
