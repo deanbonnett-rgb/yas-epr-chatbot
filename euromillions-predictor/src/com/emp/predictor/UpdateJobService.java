@@ -16,10 +16,12 @@ import android.util.Log;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.TimeZone;
 
 /**
- * Runs about once an hour. For each game with notifications on, it only goes online when a draw
- * should have been published but isn't stored yet, then posts a notification with the result.
+ * Runs about once an hour (except overnight). For each game with notifications on, it only goes
+ * online when a draw should have been published but isn't stored yet, then posts a notification
+ * with the result.
  */
 public class UpdateJobService extends JobService {
     private static final int JOB_ID = 1001;
@@ -73,6 +75,11 @@ public class UpdateJobService extends JobService {
         new Thread(new Runnable() {
             @Override public void run() {
                 boolean retry = false;
+                if (DrawSchedule.isQuietHours(System.currentTimeMillis(), TimeZone.getDefault())) {
+                    // Checked again after 7am, so overnight results arrive in the morning.
+                    jobFinished(params, false);
+                    return;
+                }
                 for (Game game : Game.ALL) {
                     if (stopped) break;
                     if (!notificationsEnabled(UpdateJobService.this, game)) continue;

@@ -130,6 +130,7 @@ public class MainActivity extends Activity {
             c.addView(text(g.country + " · " + g.formatDescription(), 14, TEXT), matchWrap(dp(6)));
             final TextView info = text("Draws " + g.drawDaysText(), 13, MUTED);
             c.addView(info, matchWrap(dp(2)));
+            if (g.drawNote != null) c.addView(text(g.drawNote, 13, MUTED), matchWrap(dp(2)));
             c.setClickable(true);
             c.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { openGame(g); }
@@ -378,7 +379,7 @@ public class MainActivity extends Activity {
 
         String fair = "a fair draw gives " + Predictor.percent(stats.main.fairProbability()) + " for main numbers";
         if (game.extraPicked) fair += " and " + Predictor.percent(stats.extra.fairProbability()) + " for the " + game.extraName;
-        String help = game == Game.POWERBALL ? "Need help? 1-800-GAMBLER" : "BeGambleAware.org · 0808 8020 133";
+        String help = "BeGambleAware.org · 0808 8020 133";
         TextView note = text("How it works: every number is weighted by the full draw history (" + stats.totalDraws
                 + " draws since " + prettyDate(stats.firstDate) + "), then lines are drawn at random using those weights. "
                 + "“Rate” is how often the chosen numbers have appeared historically – " + fair + ".\n\n"
@@ -517,8 +518,9 @@ public class MainActivity extends Activity {
             }
         });
         notifyCard.addView(notify);
-        notifyCard.addView(text("Checks after every " + g.drawDaysText() + " draw and only goes online when a new draw is due.",
-                12, MUTED));
+        notifyCard.addView(text("Checks after every " + g.drawDaysText() + " draw and only goes online when a new draw is due. "
+                + "No checks between 11pm and 7am, so overnight results arrive in the morning.", 12, MUTED));
+        if (g.drawNote != null) notifyCard.addView(text(g.drawNote + ".", 12, MUTED));
         Button test = smallButton("Send a test notification", BG);
         test.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {

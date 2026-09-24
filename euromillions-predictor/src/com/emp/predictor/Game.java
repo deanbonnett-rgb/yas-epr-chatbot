@@ -46,6 +46,13 @@ public final class Game {
     public final int resultsHour, resultsMinute;
     /** Numeric dates in this game's sources are month-first (US). */
     public final boolean usDates;
+    /**
+     * Some sources list a draw under the date it happened somewhere else (UK Powerball results are
+     * dated the morning after the US draw). Such dates are moved back to the previous draw day.
+     */
+    public final boolean snapToDrawDay;
+    /** Extra line about draw times for UK players, or null. */
+    public final String drawNote;
     public final String jackpotOdds;
     public final int accent;
     public final int extraColor;
@@ -58,6 +65,7 @@ public final class Game {
         eraStarts = b.eraStarts; mainPools = b.mainPools; extraPools = b.extraPools;
         drawDays = b.drawDays; timeZone = TimeZone.getTimeZone(b.timeZone);
         resultsHour = b.resultsHour; resultsMinute = b.resultsMinute; usDates = b.usDates;
+        snapToDrawDay = b.snapToDrawDay; drawNote = b.drawNote;
         jackpotOdds = b.jackpotOdds; accent = b.accent; extraColor = b.extraColor; sources = b.sources;
     }
 
@@ -80,14 +88,16 @@ public final class Game {
                     new Source("https://lotto.merseyworld.com/cgi-bin/lottery?days=2&Machine=Z&Ballset=0&order=1&show=1&year=0&display=CSV", Mode.FILL))
             .build();
 
-    public static final Game POWERBALL = new Builder("powerball", "Powerball", "USA")
+    public static final Game POWERBALL = new Builder("powerball", "Powerball", "USA & UK")
             .balls(5, 1, true, false, "Powerball")
             .eras(new String[]{"1992-04-22", "1997-11-05", "2002-10-09", "2005-08-31", "2009-01-07", "2012-01-15", "2015-10-07"},
                     new int[]{45, 49, 53, 55, 59, 59, 69}, new int[]{45, 42, 42, 42, 39, 35, 26})
             .schedule("America/New_York", 23, 45, Calendar.MONDAY, Calendar.WEDNESDAY, Calendar.SATURDAY)
             .look("1 in 292,201,338", 0xFFE4002B, 0xFFE4002B)
             .usDates()
-            .sources(new Source("https://raw.githubusercontent.com/jbaranski/jeffs-lottery-utils/main/numbers/powerball.csv", Mode.APPEND_NEWER))
+            .ukTiming("Drawn in the US – results about 4am UK time on Tue, Thu & Sun")
+            .sources(new Source("https://raw.githubusercontent.com/jbaranski/jeffs-lottery-utils/main/numbers/powerball.csv", Mode.APPEND_NEWER),
+                    new Source("https://www.national-lottery.co.uk/results/powerball/draw-history/csv", Mode.APPEND_NEWER))
             .build();
 
     public static final Game[] ALL = {EUROMILLIONS, LOTTO, POWERBALL};
@@ -128,6 +138,11 @@ public final class Game {
         return s;
     }
 
+    public boolean isDrawDay(int dayOfWeek) {
+        for (int d : drawDays) if (d == dayOfWeek) return true;
+        return false;
+    }
+
     public String drawDaysText() {
         String[] names = {"", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
         StringBuilder sb = new StringBuilder();
@@ -147,7 +162,8 @@ public final class Game {
     private static final class Builder {
         final String id, name, country;
         int mainCount, extraCount;
-        boolean extraPicked, extraFromMainDrum, usDates;
+        boolean extraPicked, extraFromMainDrum, usDates, snapToDrawDay;
+        String drawNote;
         String extraName, timeZone, jackpotOdds;
         String[] eraStarts;
         int[] mainPools, extraPools, drawDays;
@@ -171,6 +187,8 @@ public final class Game {
         Builder look(String odds, int accent, int extraColor) { jackpotOdds = odds; this.accent = accent; this.extraColor = extraColor; return this; }
 
         Builder usDates() { usDates = true; return this; }
+
+        Builder ukTiming(String note) { drawNote = note; snapToDrawDay = true; return this; }
 
         Builder sources(Source... s) { sources = s; return this; }
 

@@ -15,7 +15,7 @@ public final class DrawSchedule {
         c.setTimeInMillis(nowMillis);
         int minutes = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
         if (minutes < game.resultsHour * 60 + game.resultsMinute) c.add(Calendar.DAY_OF_MONTH, -1);
-        while (!isDrawDay(game, c.get(Calendar.DAY_OF_WEEK))) c.add(Calendar.DAY_OF_MONTH, -1);
+        while (!game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) c.add(Calendar.DAY_OF_MONTH, -1);
         return String.format(Locale.ROOT, "%04d-%02d-%02d",
                 c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
@@ -50,14 +50,34 @@ public final class DrawSchedule {
     }
 
     private static long epochDay(String iso) {
+        return utcDate(iso).getTimeInMillis() / 86400000L;
+    }
+
+    private static Calendar utcDate(String iso) {
         Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.UK);
         c.clear();
         c.set(Integer.parseInt(iso.substring(0, 4)), Integer.parseInt(iso.substring(5, 7)) - 1, Integer.parseInt(iso.substring(8, 10)));
-        return c.getTimeInMillis() / 86400000L;
+        return c;
     }
 
-    private static boolean isDrawDay(Game game, int dayOfWeek) {
-        for (int d : game.drawDays) if (d == dayOfWeek) return true;
-        return false;
+    /** Moves a date that isn't a draw day, but follows one, back to that draw day. */
+    public static String snapToDrawDay(Game game, String iso) {
+        Calendar c = utcDate(iso);
+        if (game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) return iso;
+        c.add(Calendar.DAY_OF_MONTH, -1);
+        if (!game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) return iso;
+        return String.format(Locale.ROOT, "%04d-%02d-%02d",
+                c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
+
+    /** Background checks stay quiet overnight so results (Powerball's arrive about 4am UK) don't wake anyone. */
+    public static boolean isQuietHours(long nowMillis, TimeZone local) {
+        Calendar c = Calendar.getInstance(local, Locale.UK);
+        c.setTimeInMillis(nowMillis);
+        int hour = c.get(Calendar.HOUR_OF_DAY);
+        return hour >= QUIET_FROM_HOUR || hour < QUIET_UNTIL_HOUR;
+    }
+
+    static final int QUIET_FROM_HOUR = 23;
+    static final int QUIET_UNTIL_HOUR = 7;
 }

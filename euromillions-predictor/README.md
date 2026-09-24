@@ -1,7 +1,10 @@
 # Lottery Predictor (Android)
 
-An Android app that generates lines for **EuroMillions**, UK **Lotto** and US **Powerball** from
+An Android app that generates lines for **EuroMillions**, UK **Lotto** and **Powerball** from
 every previous draw, and lets you copy them to the clipboard.
+
+Powerball is the US game, also sold in the UK by the National Lottery since 21 July 2026. UK
+players enter the same US draws, so one history covers both.
 
 **Download:** [`release/LotteryPredictor.apk`](release/LotteryPredictor.apk) (Android 5.0+). Open it
 on your phone and allow "install unknown apps" when asked. It installs over the older
@@ -13,7 +16,7 @@ EuroMillions Predictor.
 |---|---|---|---|
 | EuroMillions | 5 from 50 + 2 Lucky Stars from 12 | 1,983 draws, 13 Feb 2004 – 22 Sep 2026 | Tue & Fri |
 | Lotto (UK National Lottery) | 6 from 59 (bonus ball not chosen) | 3,089 draws, 19 Nov 1994 – 30 Jul 2025* | Wed & Sat |
-| Powerball (USA) | 5 from 69 + Powerball from 26 | 3,859 draws, 22 Apr 1992 – 23 Sep 2026 | Mon, Wed & Sat |
+| Powerball (USA & UK) | 5 from 69 + Powerball from 26 | 3,859 draws, 22 Apr 1992 – 23 Sep 2026 | Mon, Wed & Sat US time (about 4am UK on Tue, Thu & Sun) |
 
 \*Lotto draws after 30 Jul 2025 are downloaded the first time you open Lotto (see *Updates*).
 
@@ -42,7 +45,8 @@ compare each number only with the draws it could have appeared in, then scale to
 - **History**: the latest 100 draws.
 - **Notifications**: a switch per game on the History tab. A background check runs about once an
   hour, only goes online when a draw should be out but isn't stored yet, and posts the winning
-  numbers. Tapping it opens that game. There's also a **Send a test notification** button.
+  numbers. Tapping it opens that game. There are no checks between 11pm and 7am, so Powerball's
+  4am results arrive in the morning. There's also a **Send a test notification** button.
 
 ## Updates
 
@@ -52,10 +56,11 @@ Opening a game checks for new results when a draw is due, and so does **Update r
 |---|---|
 | EuroMillions | National Lottery CSV, [daowa89/lottery-archive](https://github.com/daowa89/lottery-archive), lottery.merseyworld.com (only when draws are missing) |
 | Lotto | National Lottery CSV (last 180 days), lotto.merseyworld.com full archive (only when draws are missing) |
-| Powerball | [jbaranski/jeffs-lottery-utils](https://github.com/jbaranski/jeffs-lottery-utils) (updated after every draw) |
+| Powerball | [jbaranski/jeffs-lottery-utils](https://github.com/jbaranski/jeffs-lottery-utils) (updated after every draw), National Lottery Powerball CSV |
 
 Stored draws are never overwritten. A download that repeats a neighbouring draw under a different
-date is ignored.
+date is ignored. Powerball results dated the UK morning after a draw are moved back to the US draw
+date.
 
 ## Data
 

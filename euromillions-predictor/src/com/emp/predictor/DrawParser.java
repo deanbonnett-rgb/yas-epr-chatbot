@@ -103,6 +103,7 @@ public final class DrawParser {
     }
 
     private static void add(List<Draw> out, Game game, String date, List<Integer> main, List<Integer> extra) {
+        if (game.snapToDrawDay) date = DrawSchedule.snapToDrawDay(game, date);
         Draw d = new Draw(date, toArray(main), toArray(extra));
         if (d.isValid(game)) out.add(d);
     }

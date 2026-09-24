@@ -46,6 +46,8 @@ public class LogicTest {
         return sb.toString();
     }
 
+    static final String L0 = "Europe/London";
+
     public static void main(String[] args) throws Exception {
         int[] expectedCounts = {1983, 3089, 3859};
         String[] firstDates = {"2004-02-13", "1994-11-19", "1992-04-22"};
@@ -139,6 +141,21 @@ public class LogicTest {
         check(Game.LOTTO.mainPool("2015-10-07") == 49 && Game.LOTTO.mainPool("2015-10-10") == 59, "Lotto: 59-ball matrix from 10 Oct 2015");
         check(Game.POWERBALL.extraPool("2015-10-03") == 35 && Game.POWERBALL.extraPool("2015-10-07") == 26, "Powerball: 26 Powerballs from 7 Oct 2015");
         check(!new Draw("2026-09-19", new int[]{1, 2, 3, 4, 5, 6}, new int[]{6}).isValid(Game.LOTTO), "Lotto: bonus ball can't repeat a main number");
+
+        // UK Powerball: a draw listed under the UK date (the morning after) keeps its US date.
+        List<Draw> ukPb = DrawParser.parse(new StringReader("DrawDate,Ball 1,Ball 2,Ball 3,Ball 4,Ball 5,Powerball,DrawNumber\n"
+                + "24-Sep-2026,5,15,26,29,30,14,1\n27-Sep-2026,1,2,3,4,5,6,2\n"), Game.POWERBALL);
+        check(ukPb.size() == 2 && ukPb.get(0).date.equals("2026-09-23") && ukPb.get(1).date.equals("2026-09-26"),
+                "Powerball: UK-dated results move back to the US draw date");
+        List<Draw> pbAll = file("assets/powerball.csv", Game.POWERBALL);
+        check(DrawParser.merge(pbAll, ukPb.subList(0, 1), Game.Mode.APPEND_NEWER).size() == pbAll.size(),
+                "Powerball: UK copy of a stored draw isn't added twice");
+        List<Draw> emOdd = DrawParser.parse(new StringReader("date,n1,n2,n3,n4,n5,s1,s2\n2026-09-23,1,2,3,4,5,1,2\n"), Game.EUROMILLIONS);
+        check(emOdd.size() == 1 && emOdd.get(0).date.equals("2026-09-23"), "other games' dates are left alone");
+        TimeZone uk = TimeZone.getTimeZone("Europe/London");
+        check(DrawSchedule.isQuietHours(at(L0, "2026-09-24 04:30"), uk) && DrawSchedule.isQuietHours(at(L0, "2026-09-24 23:15"), uk)
+                && !DrawSchedule.isQuietHours(at(L0, "2026-09-24 07:05"), uk) && !DrawSchedule.isQuietHours(at(L0, "2026-09-24 21:45"), uk),
+                "background checks are quiet 11pm-7am");
 
         // Draw timing.
         String L = "Europe/London", NY = "America/New_York";
