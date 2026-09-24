@@ -60,9 +60,18 @@ async function firebaseStore(code) {
     add: (name) => fs.addDoc(itemsRef, { name, got: false, createdAt: Date.now() }),
     setGot: (id, got) => fs.updateDoc(fs.doc(itemsRef, id), { got }),
     remove: (id) => fs.deleteDoc(fs.doc(itemsRef, id)),
-    async removeMany(ids) {
+    // Batched writes (not transactions) so these still work with no signal in the shop.
+    async finishShop(ids, pastShops) {
       const batch = fs.writeBatch(db);
+      batch.set(listRef, { history: pastShops }, { merge: true });
       ids.forEach((id) => batch.delete(fs.doc(itemsRef, id)));
+      await batch.commit();
+    },
+    setHistory: (pastShops) => fs.setDoc(listRef, { history: pastShops }, { merge: true }),
+    async addMany(names) {
+      const batch = fs.writeBatch(db);
+      const now = Date.now();
+      names.forEach((name, i) => batch.set(fs.doc(itemsRef), { name, got: false, createdAt: now + i }));
       await batch.commit();
     },
   };
@@ -76,7 +85,7 @@ function localStore(code) {
   let listeners = null;
   const save = () => {
     storageSet(key, JSON.stringify(state));
-    listeners?.onMeta({ lookFor: state.lookFor });
+    listeners?.onMeta({ lookFor: state.lookFor, history: state.history });
     listeners?.onItems(state.items.slice());
   };
   return {
@@ -85,7 +94,13 @@ function localStore(code) {
     add(name) { state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: Date.now() }); save(); },
     setGot(id, got) { const it = state.items.find((i) => i.id === id); if (it) it.got = got; save(); },
     remove(id) { state.items = state.items.filter((i) => i.id !== id); save(); },
-    removeMany(ids) { state.items = state.items.filter((i) => !ids.includes(i.id)); save(); },
+    finishShop(ids, pastShops) { state.items = state.items.filter((i) => !ids.includes(i.id)); state.history = pastShops; save(); },
+    setHistory(pastShops) { state.history = pastShops; save(); },
+    addMany(names) {
+      const now = Date.now();
+      names.forEach((name, i) => state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: now + i }));
+      save();
+    },
   };
 }
 
@@ -93,8 +108,10 @@ function localStore(code) {
 
 const code = resolveListCode();
 const shareUrl = `${location.origin}${location.pathname}#list=${code}`;
+const MAX_HISTORY = 20;
 let store;
 let items = [];
+let pastShops = []; // past shops, newest first: { id, at, lookFor, items: [names] }
 
 function renderDate(iso) {
   if (!iso) {
@@ -144,6 +161,78 @@ function renderItems() {
   $("gotCount").textContent = `Got (${got.length})`;
 }
 
+// ---------- Past shops ----------
+
+let currentLookFor = null;
+const norm = (s) => s.trim().toLowerCase();
+
+function renderHistory() {
+  const box = $("historyList");
+  box.replaceChildren();
+  $("historyEmpty").hidden = pastShops.length > 0;
+  const onList = new Set(items.filter((i) => !i.got).map((i) => norm(i.name)));
+
+  for (const shop of pastShops) {
+    const card = document.createElement("details");
+    card.className = "shop";
+    const summary = document.createElement("summary");
+    const when = new Date(shop.at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    summary.innerHTML = `<span class="shop-date"></span><span class="shop-count"></span>`;
+    summary.firstChild.textContent = when;
+    summary.lastChild.textContent = `${shop.items.length} item${shop.items.length === 1 ? "" : "s"}`;
+    card.append(summary);
+
+    const checks = [];
+    const ul = document.createElement("div");
+    ul.className = "shop-items";
+    for (const name of shop.items) {
+      const already = onList.has(norm(name));
+      const label = document.createElement("label");
+      label.className = already ? "already" : "";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !already;
+      cb.disabled = already;
+      cb.value = name;
+      const text = document.createElement("span");
+      text.textContent = already ? `${name} (already on list)` : name;
+      label.append(cb, text);
+      ul.append(label);
+      if (!already) checks.push(cb);
+    }
+    card.append(ul);
+
+    const actions = document.createElement("div");
+    actions.className = "shop-actions";
+    const toggle = document.createElement("button");
+    toggle.className = "link-btn";
+    toggle.textContent = "Select none";
+    toggle.onclick = () => {
+      const any = checks.some((c) => c.checked);
+      checks.forEach((c) => (c.checked = !any));
+      toggle.textContent = any ? "Select all" : "Select none";
+    };
+    const del = document.createElement("button");
+    del.className = "link-btn danger";
+    del.textContent = "Delete";
+    del.onclick = () => confirm(`Delete the shop from ${when}?`) && store.setHistory(pastShops.filter((h) => h.id !== shop.id));
+    const add = document.createElement("button");
+    add.className = "btn";
+    add.textContent = "Add to list";
+    add.onclick = () => {
+      const names = checks.filter((c) => c.checked).map((c) => c.value);
+      if (!names.length) return;
+      store.addMany(names);
+      $("history").close();
+    };
+    if (!checks.length) add.disabled = true;
+    actions.append(toggle, del, add);
+    card.append(actions);
+    box.append(card);
+  }
+  box.querySelector("details")?.setAttribute("open", "");
+}
+
 function wireUp() {
   document.querySelectorAll(".chip[data-days]").forEach((b) => {
     b.onclick = () => store.setDate(daysFromToday(Number(b.dataset.days)));
@@ -165,10 +254,17 @@ function wireUp() {
     $("addInput").focus();
   };
 
-  $("clearGot").onclick = () => {
-    const ids = items.filter((i) => i.got).map((i) => i.id);
-    if (ids.length && confirm(`Remove ${ids.length} ticked item${ids.length > 1 ? "s" : ""}?`)) store.removeMany(ids);
+  $("finishShop").onclick = () => {
+    const got = items.filter((i) => i.got);
+    if (!got.length) return;
+    const n = got.length;
+    if (!confirm(`Finish this shop? The ${n} ticked item${n > 1 ? "s" : ""} will be saved to Past shops and cleared from the list.`)) return;
+    const entry = { id: crypto.randomUUID(), at: Date.now(), lookFor: currentLookFor || null, items: got.map((i) => i.name) };
+    store.finishShop(got.map((i) => i.id), [entry, ...pastShops].slice(0, MAX_HISTORY));
   };
+
+  $("historyBtn").onclick = () => { renderHistory(); $("history").showModal(); };
+  $("closeHistory").onclick = () => $("history").close();
 
   $("settingsBtn").onclick = () => { $("listCode").textContent = code; $("settings").showModal(); };
   $("closeSettings").onclick = () => $("settings").close();
@@ -198,7 +294,12 @@ async function start() {
   }
   wireUp();
   store.subscribe(
-    (meta) => renderDate(meta.lookFor),
+    (meta) => {
+      currentLookFor = meta.lookFor;
+      pastShops = Array.isArray(meta.history) ? meta.history : [];
+      renderDate(meta.lookFor);
+      if ($("history").open) renderHistory();
+    },
     (list) => { items = list; renderItems(); },
     (msg) => { $("status").textContent = msg; },
   );

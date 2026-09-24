@@ -1,6 +1,6 @@
 // Caches the app shell so it opens instantly (and offline, e.g. in a shop
 // with no signal). Firestore queues changes offline and syncs when back.
-const CACHE = "shopping-v1";
+const CACHE = "shopping-v2";
 const SHELL = ["./", "index.html", "app.js", "firebase-config.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {

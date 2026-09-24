@@ -8,7 +8,12 @@ shows up on the other phone straight away.
   date. It's shared, so you both see the same date.
 - **Add items** by typing and tapping **Add**.
 - **Tick items off** while you shop. Ticked items move to a "Got" section at the
-  bottom. When you've finished, tap **Clear ticked**.
+  bottom.
+- **Finish shop ✓** saves what you ticked as a past shop (with the date) and clears
+  it from the list.
+- **🕘 Past shops** shows your previous shops. Pick one, untick anything you don't
+  need, and tap **Add to list**. Items already on the list are skipped. The last 20
+  shops are kept.
 - **Works with no signal.** Changes you make offline sync when you're back online.
 
 It's a web app you install to your home screen, so it opens full-screen with its own

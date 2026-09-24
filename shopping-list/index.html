@@ -61,7 +61,7 @@
     .del { background: transparent; color: var(--muted); font-size: 20px; padding: 4px 8px; }
     .section-title { display: flex; justify-content: space-between; align-items: center;
       color: var(--muted); font-size: 14px; margin: 20px 4px 8px; }
-    .link-btn { background: none; color: var(--accent); padding: 4px; font-size: 14px; font-weight: 600; }
+    .link-btn { white-space: nowrap; background: none; color: var(--accent); padding: 4px; font-size: 14px; font-weight: 600; }
     .empty { text-align: center; color: var(--muted); padding: 32px 0; }
 
     .banner { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--warn);
@@ -82,6 +82,23 @@
     .btn { background: var(--accent); color: #fff; padding: 10px 14px; flex: 1; font-weight: 600; }
     .btn.secondary { background: var(--accent-soft); color: var(--accent); }
     @media (prefers-color-scheme: dark) { .btn { color: #0d1a12; } .btn.secondary { color: var(--accent); } }
+    #history { max-height: 85vh; }
+    .shop { border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+    .shop summary { display: flex; justify-content: space-between; padding: 12px 14px; cursor: pointer;
+      font-weight: 600; list-style: none; }
+    .shop summary::-webkit-details-marker { display: none; }
+    .shop summary::after { content: "▾"; color: var(--muted); margin-left: 8px; }
+    .shop[open] summary::after { content: "▴"; }
+    .shop-count { margin-left: auto; color: var(--muted); font-weight: 400; }
+    .shop-items { padding: 0 14px; }
+    .shop-items label { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+      border-top: 1px solid var(--line); }
+    .shop-items input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+    .shop-items .already { color: var(--muted); }
+    .shop-actions { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); }
+    .shop-actions .btn { flex: 0 0 auto; margin-left: auto; }
+    .btn:disabled { opacity: .4; }
+    .link-btn.danger { color: #c0392b; }
     hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
   </style>
 </head>
@@ -89,7 +106,10 @@
 <main>
   <header>
     <h1>🛒 Our Shopping List</h1>
-    <button class="icon-btn" id="settingsBtn" aria-label="Share &amp; settings">⚙︎</button>
+    <div>
+      <button class="icon-btn" id="historyBtn" aria-label="Past shops">🕘</button>
+      <button class="icon-btn" id="settingsBtn" aria-label="Share &amp; settings">⚙︎</button>
+    </div>
   </header>
 
   <div id="demoBanner" class="banner" hidden>
@@ -119,12 +139,20 @@
 
   <div class="section-title" id="gotHeader" hidden>
     <span id="gotCount">Got</span>
-    <button class="link-btn" id="clearGot">Clear ticked</button>
+    <button class="link-btn" id="finishShop">Finish shop ✓</button>
   </div>
   <ul id="gotList"></ul>
 
   <p class="status" id="status"></p>
 </main>
+
+<dialog id="history">
+  <h2>Past shops</h2>
+  <p>Pick a shop, untick anything you don't need, then add the rest to the list.</p>
+  <div id="historyList"></div>
+  <p id="historyEmpty" hidden>No past shops yet. When you've finished shopping, tap <b>Finish shop ✓</b> and it'll be saved here.</p>
+  <div class="row"><button class="btn secondary" id="closeHistory">Close</button></div>
+</dialog>
 
 <dialog id="settings">
   <h2>Share this list</h2>
