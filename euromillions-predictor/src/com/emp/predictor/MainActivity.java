@@ -1,12 +1,16 @@
 package com.emp.predictor;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -71,6 +75,10 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(BG);
         store = new ResultsStore(this);
         setContentView(buildShell());
+        if (UpdateJobService.notificationsEnabled(this)) {
+            askNotificationPermission(false);
+            UpdateJobService.schedule(this);
+        }
         status.setText("Loading results…");
         new Thread(new Runnable() {
             @Override public void run() {
@@ -386,6 +394,30 @@ public class MainActivity extends Activity {
     // ---------------------------------------------------------------- History tab
 
     private void buildHistory(LinearLayout body) {
+        LinearLayout notifyCard = card();
+        CheckBox notify = new CheckBox(this);
+        notify.setText("Notify me when new results are published");
+        notify.setTextColor(TEXT);
+        notify.setChecked(UpdateJobService.notificationsEnabled(this));
+        notify.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton b, boolean checked) {
+                UpdateJobService.setNotificationsEnabled(MainActivity.this, checked);
+                if (checked) askNotificationPermission(true);
+            }
+        });
+        notifyCard.addView(notify);
+        notifyCard.addView(text("Checks after every Tuesday and Friday draw (results are usually out by 21:30 UK time) "
+                + "and only goes online when a new draw is due.", 12, MUTED));
+        Button test = smallButton("Send a test notification", BG);
+        test.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                askNotificationPermission(true);
+                UpdateJobService.showResult(MainActivity.this, draws.get(draws.size() - 1), 1);
+            }
+        });
+        notifyCard.addView(test, matchWrap(dp(8)));
+        body.addView(notifyCard, matchWrap(0));
+
         body.addView(text("Most recent 100 draws (all " + stats.totalDraws + " are used for predictions)", 12, MUTED));
         for (int i = draws.size() - 1; i >= Math.max(0, draws.size() - 100); i--) {
             Draw d = draws.get(i);
@@ -398,6 +430,16 @@ public class MainActivity extends Activity {
             c.addView(balls, matchWrap(dp(6)));
             body.addView(c, matchWrap(dp(8)));
         }
+    }
+
+    /** Android 13+ needs the user's permission before any notification can be shown. */
+    private void askNotificationPermission(boolean force) {
+        if (Build.VERSION.SDK_INT < 33) return;
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
+        SharedPreferences prefs = getSharedPreferences(UpdateJobService.PREFS, MODE_PRIVATE);
+        if (!force && prefs.getBoolean("asked_notifications", false)) return;
+        prefs.edit().putBoolean("asked_notifications", true).apply();
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
     }
 
     // ---------------------------------------------------------------- view helpers
@@ -495,7 +537,7 @@ public class MainActivity extends Activity {
         return draws + " draw" + (draws == 1 ? "" : "s") + " ago";
     }
 
-    private static String prettyDate(String iso) {
+    static String prettyDate(String iso) {
         try {
             SimpleDateFormat in = new SimpleDateFormat("yyyy-MM-dd", Locale.UK);
             return new SimpleDateFormat("EEE d MMM yyyy", Locale.UK).format(in.parse(iso));

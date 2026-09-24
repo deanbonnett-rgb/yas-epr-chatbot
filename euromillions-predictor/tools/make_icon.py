@@ -1,4 +1,4 @@
-"""Draws the launcher icon (a white ball and a gold star on navy) at each density."""
+"""Draws the launcher icon (white ball and gold star on navy) and the notification star at each density."""
 import math
 import os
 import sys
@@ -24,3 +24,19 @@ for name, px in SIZES.items():
     out = os.path.join(res, "mipmap-" + name)
     os.makedirs(out, exist_ok=True)
     img.resize((px, px), Image.LANCZOS).save(os.path.join(out, "ic_launcher.png"))
+
+# Notification icon: white star on transparent, 24dp.
+N = 480
+star = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+ds = ImageDraw.Draw(star)
+pts = []
+for i in range(10):
+    r = 225 if i % 2 == 0 else 95
+    a = -math.pi / 2 + i * math.pi / 5
+    pts.append((N / 2 + r * math.cos(a), N / 2 + 18 + r * math.sin(a)))
+ds.polygon(pts, fill=(255, 255, 255, 255))
+for name, scale in {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}.items():
+    out = os.path.join(res, "drawable-" + name)
+    os.makedirs(out, exist_ok=True)
+    px = int(24 * scale)
+    star.resize((px, px), Image.LANCZOS).save(os.path.join(out, "ic_notification.png"))

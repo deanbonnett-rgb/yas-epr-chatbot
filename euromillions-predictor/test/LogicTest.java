@@ -1,10 +1,12 @@
 import com.emp.predictor.Draw;
 import com.emp.predictor.DrawParser;
+import com.emp.predictor.DrawSchedule;
 import com.emp.predictor.Predictor;
 import com.emp.predictor.Stats;
 
 import java.io.FileReader;
 import java.io.StringReader;
+import java.text.SimpleDateFormat;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -17,6 +19,12 @@ public class LogicTest {
     static void check(boolean ok, String what) {
         System.out.println((ok ? "PASS " : "FAIL ") + what);
         if (!ok) failures++;
+    }
+
+    static long ukTime(String t) throws Exception {
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        f.setTimeZone(DrawSchedule.UK);
+        return f.parse(t).getTime();
     }
 
     public static void main(String[] args) throws Exception {
@@ -71,6 +79,14 @@ public class LogicTest {
         for (Predictor.Line l : p.generate(4000, Predictor.HOT, false)) for (int n : l.main) hits[n]++;
         check(hits[best] > hits[worst], "hot strategy picks most frequent number (" + best + ": " + hits[best]
                 + ") more than least frequent (" + worst + ": " + hits[worst] + ")");
+
+        // Draw timing (UK time; 22 Sep 2026 is a Tuesday, during BST = UTC+1).
+        check(DrawSchedule.latestExpectedDraw(ukTime("2026-09-22 21:00")).equals("2026-09-18"), "before results: expect Friday's draw");
+        check(DrawSchedule.latestExpectedDraw(ukTime("2026-09-22 21:45")).equals("2026-09-22"), "after results: expect Tuesday's draw");
+        check(DrawSchedule.latestExpectedDraw(ukTime("2026-09-24 10:00")).equals("2026-09-22"), "Thursday: still Tuesday's draw");
+        check(DrawSchedule.latestExpectedDraw(ukTime("2026-12-26 09:00")).equals("2026-12-25"), "Saturday morning: Friday's draw");
+        check(!DrawSchedule.updateDue("2026-09-22", ukTime("2026-09-25 12:00")), "no network check when up to date");
+        check(DrawSchedule.updateDue("2026-09-22", ukTime("2026-09-25 22:00")), "check due after Friday's draw");
 
         System.out.println(failures == 0 ? "ALL PASSED" : failures + " FAILED");
         System.exit(failures == 0 ? 0 : 1);

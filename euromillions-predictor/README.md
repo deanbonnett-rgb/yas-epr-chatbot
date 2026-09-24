@@ -24,6 +24,11 @@ A small Android app that generates EuroMillions lines from **every previous draw
   (vs 10.0% / 16.7% for a fair draw), recent count and draws since last seen. Lucky Stars are
   adjusted for the pool growing from 9 → 11 (May 2011) → 12 (Sep 2016).
 - **History**: the latest 100 draws.
+- **New-result notifications** (on by default, switch on the History tab): a background check runs
+  about once an hour. It only goes online when a Tuesday/Friday draw should be out (after 21:30 UK
+  time) and isn't stored yet. When the new draw arrives you get a notification with the winning
+  numbers, and tapping it opens the app. The History tab also has a **Send a test notification** button.
+  Android 13+ asks for notification permission the first time the app opens.
 - **Update results**: runs on launch and on demand. It fetches new draws from the National
   Lottery's draw-history CSV and a public GitHub archive
   ([daowa89/lottery-archive](https://github.com/daowa89/lottery-archive)). Only draws newer than
