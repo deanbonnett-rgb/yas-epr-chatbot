@@ -1,7 +1,8 @@
 # Lottery Predictor (Android)
 
-An Android app that generates lines for **EuroMillions**, UK **Lotto** and **Powerball** from
-every previous draw, and lets you copy them to the clipboard.
+An Android app that generates lines for **EuroMillions**, **Lotto**, **Set For Life**,
+**Thunderball** and **Powerball** from previous draws, lets you copy them to the clipboard, and
+reminds you the day before each draw.
 
 Powerball is the US game, also sold in the UK by the National Lottery since 21 July 2026. UK
 players enter the same US draws, so one history covers both.
@@ -15,10 +16,18 @@ EuroMillions Predictor.
 | Game | Format today | History bundled | Draws |
 |---|---|---|---|
 | EuroMillions | 5 from 50 + 2 Lucky Stars from 12 | 1,983 draws, 13 Feb 2004 – 22 Sep 2026 | Tue & Fri |
-| Lotto (UK National Lottery) | 6 from 59 (bonus ball not chosen) | 3,089 draws, 19 Nov 1994 – 30 Jul 2025* | Wed & Sat |
+| Lotto (UK National Lottery) | 6 from 59 (bonus ball not chosen), two rounds per draw since 10 Jun 2026 | 3,089 draws, 19 Nov 1994 – 30 Jul 2025* | Wed & Sat |
+| Set For Life | 5 from 47 + Life Ball from 10 | 785 draws, 18 Mar 2019 – 21 Sep 2026 (complete) | Mon & Thu |
+| Thunderball | 5 from 39 + Thunderball from 14 | 314 draws: 21 Dec 2021 – 18 Jun 2022 and 19 Sep 2025 – 23 Sep 2026** | Tue, Wed, Fri & Sat |
 | Powerball (USA & UK) | 5 from 69 + Powerball from 26 | 3,859 draws, 22 Apr 1992 – 23 Sep 2026 | Mon, Wed & Sat US time (about 4am UK on Tue, Thu & Sun) |
 
 \*Lotto draws after 30 Jul 2025 are downloaded the first time you open Lotto (see *Updates*).
+Since 10 June 2026 every Lotto night has two draws (rounds). The app stores both, whether a results
+file puts them on separate rows or on one row.
+
+\*\*The full Thunderball history (since 1999) wasn't available. The app uses the two official
+180-day downloads that were (the official file is missing 1 and 2 May 2026), and adds every new
+draw from now on.
 
 The rules changed over the years: Lotto went from 49 to 59 balls (Oct 2015), Powerball went through
 seven formats (1992–2015), and EuroMillions Lucky Stars went from 9 to 11 to 12. The statistics
@@ -43,6 +52,10 @@ compare each number only with the draws it could have appeared in, then scale to
 - **Statistics**: for each number, times drawn, historical chance per draw (vs. a fair draw),
   recent count and draws since last seen. Sort by number or by frequency.
 - **History**: the latest 100 draws.
+- **Reminders**: on the games screen, tick the games you play and pick a time (7am–10pm, default
+  6pm). The day before each of their draws you get "draw tomorrow" with a suggested line, and
+  tapping it opens the game. Each History tab has the same switch and a **Send a test reminder**
+  button. Powerball reminders follow the UK ticket days (Mon, Wed & Sat).
 - **Notifications**: a switch per game on the History tab. A background check runs about once an
   hour, only goes online when a draw should be out but isn't stored yet, and posts the winning
   numbers. Tapping it opens that game. There are no checks between 11pm and 7am, so Powerball's
@@ -56,6 +69,8 @@ Opening a game checks for new results when a draw is due, and so does **Update r
 |---|---|
 | EuroMillions | National Lottery CSV, [daowa89/lottery-archive](https://github.com/daowa89/lottery-archive), lottery.merseyworld.com (only when draws are missing) |
 | Lotto | National Lottery CSV (last 180 days), lotto.merseyworld.com full archive (only when draws are missing) |
+| Set For Life | [apkelepouris/predict-for-life-data](https://github.com/apkelepouris/predict-for-life-data) (updated after every draw), National Lottery CSV |
+| Thunderball | National Lottery CSV |
 | Powerball | [jbaranski/jeffs-lottery-utils](https://github.com/jbaranski/jeffs-lottery-utils) (updated after every draw), National Lottery Powerball CSV |
 
 Stored draws are never overwritten. A download that repeats a neighbouring draw under a different
@@ -67,14 +82,24 @@ date.
 - EuroMillions: draws 1–1863 from the lottery.merseyworld.com archive, later draws from
   daowa89/lottery-archive. Every date the two share has the same numbers.
 - Lotto: draws 1–3089 from the lotto.merseyworld.com archive.
+- Set For Life: apkelepouris/predict-for-life-data, every Monday and Thursday draw since the first.
+- Thunderball: official National Lottery downloads saved in
+  [newportg/POC-Thunderball](https://github.com/newportg/POC-Thunderball) and
+  [markheydon/national-lottery-library](https://github.com/markheydon/national-lottery-library).
+- The 2022 official Lotto and EuroMillions downloads in markheydon/national-lottery-library match
+  the bundled history on all 52 draws each.
+- National Lottery downloads come from `api-dfe.national-lottery.co.uk/draw-game/results/<id>/download`
+  (Lotto 1, Set For Life 3, Thunderball 4, EuroMillions 33), with the older
+  `www.national-lottery.co.uk/results/<game>/draw-history/csv` addresses kept as a fallback.
 - Powerball: 1992–2019 from [jt2002/Data-Science-for-Powerball](https://github.com/jt2002/Data-Science-for-Powerball),
   Oct 2015 onwards from jbaranski/jeffs-lottery-utils. All 421 overlapping draws match.
 
 ## A note on odds
 
 Every draw is random and independent. Past results don't change future odds. Whatever method picks
-a line, the jackpot chance stays at 1 in 139,838,160 (EuroMillions), 1 in 45,057,474 (Lotto) or
-1 in 292,201,338 (Powerball). The app is for fun.
+a line, the jackpot chance stays at 1 in 139,838,160 (EuroMillions), 1 in 45,057,474 per round (Lotto) or
+1 in 292,201,338 (Powerball). Set For Life's top prize is 1 in 15,339,390 and Thunderball's is
+1 in 8,060,598. The app is for fun.
 
 ## Building
 

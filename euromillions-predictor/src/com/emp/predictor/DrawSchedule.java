@@ -78,6 +78,21 @@ public final class DrawSchedule {
         return hour >= QUIET_FROM_HOUR || hour < QUIET_UNTIL_HOUR;
     }
 
-    static final int QUIET_FROM_HOUR = 23;
-    static final int QUIET_UNTIL_HOUR = 7;
+    public static final int QUIET_FROM_HOUR = 23;
+    public static final int QUIET_UNTIL_HOUR = 7;
+
+    /**
+     * The draw date (yyyy-MM-dd, phone's calendar) to remind the player about, or null. A reminder
+     * is due from {@code reminderHour} on the day before a draw, once per draw.
+     */
+    public static String reminderFor(Game game, long nowMillis, TimeZone local, int reminderHour, String lastReminded) {
+        Calendar c = Calendar.getInstance(local, Locale.UK);
+        c.setTimeInMillis(nowMillis);
+        if (c.get(Calendar.HOUR_OF_DAY) < reminderHour) return null;
+        c.add(Calendar.DAY_OF_MONTH, 1);
+        if (!game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) return null;
+        String drawDate = String.format(Locale.ROOT, "%04d-%02d-%02d",
+                c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+        return drawDate.equals(lastReminded) ? null : drawDate;
+    }
 }

@@ -49,8 +49,8 @@ public class LogicTest {
     static final String L0 = "Europe/London";
 
     public static void main(String[] args) throws Exception {
-        int[] expectedCounts = {1983, 3089, 3859};
-        String[] firstDates = {"2004-02-13", "1994-11-19", "1992-04-22"};
+        int[] expectedCounts = {1983, 3089, 785, 314, 3859};
+        String[] firstDates = {"2004-02-13", "1994-11-19", "2019-03-18", "2021-12-21", "1992-04-22"};
         for (int gi = 0; gi < Game.ALL.length; gi++) {
             Game g = Game.ALL[gi];
             List<Draw> draws = file("assets/" + g.id + ".csv", g);
@@ -59,7 +59,7 @@ public class LogicTest {
             Set<String> dates = new HashSet<>();
             for (Draw d : draws) dates.add(d.date);
             check(dates.size() == draws.size(), g.name + ": no duplicate draw dates");
-            check(!DrawSchedule.hasGap(draws), g.name + ": no gaps in bundled history");
+            if (g.historyNote == null) check(!DrawSchedule.hasGap(draws), g.name + ": no gaps in bundled history");
 
             // Round trip through the app's own save format.
             StringWriter w = new StringWriter();
@@ -110,32 +110,32 @@ public class LogicTest {
         check(lottoMersey.size() == 15 && nums(lottoMersey.get(0)).equals("1994-11-19 3 5 14 22 30 44 + 10"),
                 "Lotto: reads merseyworld archive page (" + lottoMersey.size() + " draws)");
         List<Draw> emNl = file("test/fixtures/national_lottery_euromillions.csv", Game.EUROMILLIONS);
-        check(emNl.size() == 2 && nums(emNl.get(0)).equals("2026-09-25 1 9 20 33 47 + 4 12"), "EuroMillions: reads National Lottery CSV");
+        check(emNl.size() == 2 && nums(emNl.get(1)).equals("2026-09-25 1 9 20 33 47 + 4 12"), "EuroMillions: reads National Lottery CSV");
         List<Draw> lottoNl = file("test/fixtures/national_lottery_lotto.csv", Game.LOTTO);
-        check(lottoNl.size() == 2 && nums(lottoNl.get(0)).equals("2026-09-19 4 11 23 35 47 58 + 19"),
+        check(lottoNl.size() == 2 && nums(lottoNl.get(1)).equals("2026-09-19 4 11 23 35 47 58 + 19"),
                 "Lotto: reads National Lottery CSV (Ball Set column ignored)");
         List<Draw> pbJ = file("test/fixtures/powerball_jbaranski.csv", Game.POWERBALL);
         check(pbJ.size() == 6 && nums(pbJ.get(5)).equals("2026-09-23 5 15 26 29 30 + 14"), "Powerball: reads white_balls|red_ball CSV with US dates");
         List<Draw> pb92 = file("test/fixtures/powerball_1992.csv", Game.POWERBALL);
-        check(pb92.size() == 3 && nums(pb92.get(0)).equals("2019-10-16 1 5 25 63 67 + 3"), "Powerball: reads ball1..powerball CSV");
+        check(pb92.size() == 3 && nums(pb92.get(2)).equals("2019-10-16 1 5 25 63 67 + 3"), "Powerball: reads ball1..powerball CSV");
         List<Draw> combined = DrawParser.parse(new StringReader("Draw Date,Winning Numbers,Multiplier\n09/23/2026,05 15 26 29 30 14,5\n"), Game.POWERBALL);
         check(combined.size() == 1 && nums(combined.get(0)).equals("2026-09-23 5 15 26 29 30 + 14"), "Powerball: reads combined Winning Numbers column");
 
         // Merging.
         List<Draw> lotto = file("assets/lotto.csv", Game.LOTTO);
-        List<Draw> recent = DrawParser.merge(lotto, lottoNl, Game.Mode.APPEND_NEWER);
+        List<Draw> recent = DrawParser.merge(lotto, lottoNl, Game.LOTTO, Game.Mode.APPEND_NEWER);
         check(recent.size() == lotto.size() + 2, "Lotto: newer draws appended");
         check(DrawSchedule.hasGap(recent), "Lotto: gap between bundled history and latest download is detected");
         List<Draw> wrongDate = new ArrayList<>();
         Draw last = lotto.get(lotto.size() - 1);
         wrongDate.add(new Draw("2025-08-02", last.main, last.extra));
-        check(DrawParser.merge(lotto, wrongDate, Game.Mode.APPEND_NEWER).size() == lotto.size(), "repeat of previous draw under a new date is ignored");
+        check(DrawParser.merge(lotto, wrongDate, Game.LOTTO, Game.Mode.APPEND_NEWER).size() == lotto.size(), "repeat of previous draw under a new date is ignored");
         List<Draw> hole = new ArrayList<>(lotto);
         Draw removed = hole.remove(1500);
-        List<Draw> filled = DrawParser.merge(hole, lotto, Game.Mode.FILL);
+        List<Draw> filled = DrawParser.merge(hole, lotto, Game.LOTTO, Game.Mode.FILL);
         check(filled.size() == lotto.size() && filled.get(1500).date.equals(removed.date), "FILL restores a missing draw");
-        check(DrawParser.merge(hole, lotto, Game.Mode.APPEND_NEWER).size() == hole.size(), "APPEND_NEWER never back-fills");
-        check(DrawParser.merge(lotto, lottoMersey, Game.Mode.FILL).size() == lotto.size(), "FILL never replaces stored draws");
+        check(DrawParser.merge(hole, lotto, Game.LOTTO, Game.Mode.APPEND_NEWER).size() == hole.size(), "APPEND_NEWER never back-fills");
+        check(DrawParser.merge(lotto, lottoMersey, Game.LOTTO, Game.Mode.FILL).size() == lotto.size(), "FILL never replaces stored draws");
 
         // Rules by era.
         check(Game.LOTTO.mainPool("2015-10-07") == 49 && Game.LOTTO.mainPool("2015-10-10") == 59, "Lotto: 59-ball matrix from 10 Oct 2015");
@@ -148,7 +148,7 @@ public class LogicTest {
         check(ukPb.size() == 2 && ukPb.get(0).date.equals("2026-09-23") && ukPb.get(1).date.equals("2026-09-26"),
                 "Powerball: UK-dated results move back to the US draw date");
         List<Draw> pbAll = file("assets/powerball.csv", Game.POWERBALL);
-        check(DrawParser.merge(pbAll, ukPb.subList(0, 1), Game.Mode.APPEND_NEWER).size() == pbAll.size(),
+        check(DrawParser.merge(pbAll, ukPb.subList(0, 1), Game.POWERBALL, Game.Mode.APPEND_NEWER).size() == pbAll.size(),
                 "Powerball: UK copy of a stored draw isn't added twice");
         List<Draw> emOdd = DrawParser.parse(new StringReader("date,n1,n2,n3,n4,n5,s1,s2\n2026-09-23,1,2,3,4,5,1,2\n"), Game.EUROMILLIONS);
         check(emOdd.size() == 1 && emOdd.get(0).date.equals("2026-09-23"), "other games' dates are left alone");
@@ -156,6 +156,42 @@ public class LogicTest {
         check(DrawSchedule.isQuietHours(at(L0, "2026-09-24 04:30"), uk) && DrawSchedule.isQuietHours(at(L0, "2026-09-24 23:15"), uk)
                 && !DrawSchedule.isQuietHours(at(L0, "2026-09-24 07:05"), uk) && !DrawSchedule.isQuietHours(at(L0, "2026-09-24 21:45"), uk),
                 "background checks are quiet 11pm-7am");
+
+        // Set For Life and Thunderball formats.
+        List<Draw> sfl = file("test/fixtures/set_for_life_github.csv", Game.SET_FOR_LIFE);
+        check(sfl.size() == 3 && nums(sfl.get(2)).equals("2026-09-21 24 28 37 40 42 + 7"), "Set For Life: reads GitHub CSV (d/m/y dates, Life column)");
+        List<Draw> sflNl = file("test/fixtures/national_lottery_set_for_life.csv", Game.SET_FOR_LIFE);
+        check(sflNl.size() == 2 && nums(sflNl.get(1)).equals("2026-09-21 24 28 37 40 42 + 7"), "Set For Life: reads National Lottery CSV (Life Ball)");
+        List<Draw> tbNl = file("test/fixtures/national_lottery_thunderball.csv", Game.THUNDERBALL);
+        check(tbNl.size() == 3 && nums(tbNl.get(2)).equals("2026-09-23 8 18 21 24 34 + 1"), "Thunderball: reads National Lottery CSV");
+        List<Draw> tbAll = file("assets/thunderball.csv", Game.THUNDERBALL);
+        check(DrawParser.merge(tbAll, tbNl, Game.THUNDERBALL, Game.Mode.APPEND_NEWER).size() == tbAll.size(), "Thunderball: stored draws not duplicated");
+
+        // Lotto's two rounds per night since 10 Jun 2026.
+        List<Draw> twoRows = DrawParser.parse(new StringReader("DrawDate,Ball 1,Ball 2,Ball 3,Ball 4,Ball 5,Ball 6,Bonus Ball,Ball Set,Machine,DrawNumber\n"
+                + "23-Sep-2026,1,2,3,4,5,6,7,1,Arthur,3310\n23-Sep-2026,11,12,13,14,15,16,17,2,Merlin,3311\n"), Game.LOTTO);
+        check(twoRows.size() == 2, "Lotto: two rounds on separate rows both read");
+        List<Draw> oneRow = DrawParser.parse(new StringReader("DrawDate,Round 1 Ball 1,Round 1 Ball 2,Round 1 Ball 3,Round 1 Ball 4,Round 1 Ball 5,Round 1 Ball 6,"
+                + "Round 1 Bonus Ball,Round 2 Ball 1,Round 2 Ball 2,Round 2 Ball 3,Round 2 Ball 4,Round 2 Ball 5,Round 2 Ball 6,Round 2 Bonus Ball,DrawNumber\n"
+                + "23-Sep-2026,1,2,3,4,5,6,7,11,12,13,14,15,16,17,3310\n"), Game.LOTTO);
+        check(oneRow.size() == 2 && nums(oneRow.get(1)).equals("2026-09-23 11 12 13 14 15 16 + 17"), "Lotto: two rounds on one row split into two draws");
+        List<Draw> withRounds = DrawParser.merge(lotto, twoRows, Game.LOTTO, Game.Mode.APPEND_NEWER);
+        check(withRounds.size() == lotto.size() + 2, "Lotto: both rounds of a night are stored");
+        List<Draw> third = new ArrayList<>(twoRows);
+        third.add(new Draw("2026-09-23", new int[]{21, 22, 23, 24, 25, 26}, new int[]{27}));
+        check(DrawParser.merge(lotto, third, Game.LOTTO, Game.Mode.APPEND_NEWER).size() == lotto.size() + 2, "Lotto: never more than two draws a night");
+        List<Draw> oldDay = new ArrayList<>();
+        oldDay.add(new Draw("2025-07-30", new int[]{21, 22, 23, 24, 25, 26}, new int[]{27}));
+        check(DrawParser.merge(lotto, oldDay, Game.LOTTO, Game.Mode.FILL).size() == lotto.size(), "Lotto: one draw a night before June 2026");
+
+        // Reminders the day before a draw (phone in UK time).
+        TimeZone ukTz = TimeZone.getTimeZone("Europe/London");
+        check("2026-09-26".equals(DrawSchedule.reminderFor(Game.LOTTO, at(L0, "2026-09-25 18:10"), ukTz, 18, null)), "reminder: Friday 6pm for Saturday's Lotto");
+        check(DrawSchedule.reminderFor(Game.LOTTO, at(L0, "2026-09-25 17:50"), ukTz, 18, null) == null, "reminder: not before the chosen time");
+        check(DrawSchedule.reminderFor(Game.LOTTO, at(L0, "2026-09-25 19:10"), ukTz, 18, "2026-09-26") == null, "reminder: only once per draw");
+        check(DrawSchedule.reminderFor(Game.LOTTO, at(L0, "2026-09-24 18:10"), ukTz, 18, null) == null, "reminder: none when tomorrow has no draw");
+        check("2026-09-28".equals(DrawSchedule.reminderFor(Game.SET_FOR_LIFE, at(L0, "2026-09-27 18:00"), ukTz, 18, null)), "reminder: Sunday for Monday's Set For Life");
+        check("2026-09-26".equals(DrawSchedule.reminderFor(Game.POWERBALL, at(L0, "2026-09-25 20:00"), ukTz, 18, null)), "reminder: Friday for Saturday's Powerball ticket day");
 
         // Draw timing.
         String L = "Europe/London", NY = "America/New_York";

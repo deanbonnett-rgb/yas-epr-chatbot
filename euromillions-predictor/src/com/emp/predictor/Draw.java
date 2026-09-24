@@ -45,6 +45,7 @@ public final class Draw implements Comparable<Draw> {
 
     @Override
     public int compareTo(Draw o) {
-        return date.compareTo(o.date);
+        int c = date.compareTo(o.date);
+        return c != 0 ? c : (Arrays.toString(main) + Arrays.toString(extra)).compareTo(Arrays.toString(o.main) + Arrays.toString(o.extra));
     }
 }

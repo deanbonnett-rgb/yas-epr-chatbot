@@ -38,7 +38,7 @@ public final class ResultsStore {
         File saved = savedFile();
         if (saved.exists()) {
             try (InputStreamReader r = new InputStreamReader(new FileInputStream(saved), StandardCharsets.UTF_8)) {
-                return DrawParser.merge(bundled, DrawParser.parse(r, game), Game.Mode.FILL);
+                return DrawParser.merge(bundled, DrawParser.parse(r, game), game, Game.Mode.FILL);
             } catch (IOException e) {
                 saved.delete();
             }
@@ -49,7 +49,8 @@ public final class ResultsStore {
     /** Whether opening the game should go online: a draw is due, or there is a hole to fill. */
     public boolean updateWanted(List<Draw> draws, long nowMillis) {
         if (draws.isEmpty()) return true;
-        return DrawSchedule.updateDue(game, draws.get(draws.size() - 1).date, nowMillis) || DrawSchedule.drawsMissing(game, draws, nowMillis);
+        return DrawSchedule.updateDue(game, draws.get(draws.size() - 1).date, nowMillis)
+                || game.hasFillSource() && DrawSchedule.drawsMissing(game, draws, nowMillis);
     }
 
     /**
@@ -63,7 +64,7 @@ public final class ResultsStore {
         for (Game.Source source : game.sources) {
             if (source.mode == Game.Mode.FILL && !DrawSchedule.drawsMissing(game, merged, System.currentTimeMillis())) continue;
             try {
-                merged = DrawParser.merge(merged, download(source.url), source.mode);
+                merged = DrawParser.merge(merged, download(source.url), game, source.mode);
                 anyOk = true;
             } catch (IOException | RuntimeException e) {
                 lastError = e instanceof IOException ? (IOException) e : new IOException(e);

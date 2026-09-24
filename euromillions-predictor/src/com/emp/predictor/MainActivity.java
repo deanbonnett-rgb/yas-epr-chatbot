@@ -2,6 +2,7 @@ package com.emp.predictor;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.TimePickerDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -28,6 +29,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.TimePicker;
 import android.widget.Toast;
 
 import java.security.SecureRandom;
@@ -78,10 +80,10 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
-        if (UpdateJobService.anyNotificationsEnabled(this)) {
+        if (UpdateJobService.anyNotificationsEnabled(this) || UpdateJobService.anyRemindersEnabled(this)) {
             askNotificationPermission(false);
-            UpdateJobService.schedule(this);
         }
+        UpdateJobService.schedule(this);
         Game requested = Game.byId(String.valueOf(getIntent().getStringExtra(UpdateJobService.EXTRA_GAME)));
         if (requested != null) openGame(requested); else showPicker();
     }
@@ -131,6 +133,7 @@ public class MainActivity extends Activity {
             final TextView info = text("Draws " + g.drawDaysText(), 13, MUTED);
             c.addView(info, matchWrap(dp(2)));
             if (g.drawNote != null) c.addView(text(g.drawNote, 13, MUTED), matchWrap(dp(2)));
+            if (g.historyNote != null) c.addView(text(g.historyNote, 12, MUTED), matchWrap(dp(2)));
             c.setClickable(true);
             c.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { openGame(g); }
@@ -138,6 +141,7 @@ public class MainActivity extends Activity {
             root.addView(c, matchWrap(dp(16)));
             loadSummary(g, info);
         }
+        root.addView(remindersCard(), matchWrap(dp(20)));
         root.addView(text("Draws are random – no method can change the odds. Play for fun and only spend what you can afford.",
                 12, MUTED), matchWrap(dp(20)));
 
@@ -145,6 +149,52 @@ public class MainActivity extends Activity {
         scroll.setBackgroundColor(BG);
         scroll.addView(root);
         setContentView(scroll);
+    }
+
+    /** Picker card for "draw tomorrow" reminders: which games, and at what time. */
+    private View remindersCard() {
+        LinearLayout c = card();
+        c.addView(sectionTitle("Reminders"));
+        c.addView(text("A notification the day before each draw of the games you tick, with a suggested line.", 12, MUTED));
+
+        LinearLayout timeRow = horizontal();
+        timeRow.setGravity(Gravity.CENTER_VERTICAL);
+        timeRow.addView(text("Reminder time", 15, TEXT), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        final Button time = smallButton(hourText(UpdateJobService.reminderHour(this)), BG);
+        time.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                new TimePickerDialog(MainActivity.this, new TimePickerDialog.OnTimeSetListener() {
+                    @Override public void onTimeSet(TimePicker p, int hour, int minute) {
+                        // Background checks sleep 11pm-7am, so keep reminders inside the day.
+                        int h = Math.max(DrawSchedule.QUIET_UNTIL_HOUR, Math.min(DrawSchedule.QUIET_FROM_HOUR - 1, hour));
+                        if (h != hour) Toast.makeText(MainActivity.this, "Reminders are sent between 7am and 10pm", Toast.LENGTH_SHORT).show();
+                        UpdateJobService.setReminderHour(MainActivity.this, h);
+                        time.setText(hourText(h));
+                    }
+                }, UpdateJobService.reminderHour(MainActivity.this), 0, true).show();
+            }
+        });
+        timeRow.addView(time);
+        c.addView(timeRow, matchWrap(dp(8)));
+
+        for (final Game g : Game.ALL) {
+            CheckBox box = new CheckBox(this);
+            box.setText(g.name + " – day before " + g.drawDaysText() + " draws");
+            box.setTextColor(TEXT);
+            box.setChecked(UpdateJobService.reminderEnabled(this, g));
+            box.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override public void onCheckedChanged(CompoundButton b, boolean checked) {
+                    UpdateJobService.setReminderEnabled(MainActivity.this, g, checked);
+                    if (checked) askNotificationPermission(true);
+                }
+            });
+            c.addView(box, matchWrap(dp(2)));
+        }
+        return c;
+    }
+
+    private static String hourText(int hour) {
+        return String.format(Locale.UK, "%02d:00", hour);
     }
 
     /** Fills in each picker card's draw count and latest draw date. */
@@ -438,6 +488,7 @@ public class MainActivity extends Activity {
         boolean poolsChanged = !stats.firstDate.isEmpty() && !game.isCurrentEra(stats.firstDate);
         String eraNote = poolsChanged
                 ? " The rules have changed over the years, so each number is only compared with draws it could appear in." : "";
+        if (game.historyNote != null) eraNote += " " + game.historyNote + ".";
         body.addView(ballSection("Main numbers (1–" + stats.main.pool + ")", stats.main, false,
                 "Chance of appearing in a draw, from all " + stats.totalDraws + " draws. A fair draw gives "
                         + Predictor.percent(stats.main.fairProbability()) + "." + eraNote), matchWrap(dp(12)));
@@ -525,10 +576,36 @@ public class MainActivity extends Activity {
         test.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 askNotificationPermission(true);
-                UpdateJobService.showResult(MainActivity.this, g, draws.get(draws.size() - 1));
+                UpdateJobService.showResult(MainActivity.this, g, UpdateJobService.latestNight(draws));
             }
         });
         notifyCard.addView(test, matchWrap(dp(8)));
+
+        CheckBox remind = new CheckBox(this);
+        remind.setText("Remind me the day before each " + g.name + " draw");
+        remind.setTextColor(TEXT);
+        remind.setChecked(UpdateJobService.reminderEnabled(this, g));
+        remind.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton b, boolean checked) {
+                UpdateJobService.setReminderEnabled(MainActivity.this, g, checked);
+                if (checked) askNotificationPermission(true);
+            }
+        });
+        notifyCard.addView(remind, matchWrap(dp(12)));
+        notifyCard.addView(text("Sent at about " + hourText(UpdateJobService.reminderHour(this))
+                + " with a suggested line. Change the time on the games screen.", 12, MUTED));
+        Button testReminder = smallButton("Send a test reminder", BG);
+        testReminder.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                askNotificationPermission(true);
+                try {
+                    UpdateJobService.showTestReminder(MainActivity.this, g);
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "Could not create reminder", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        notifyCard.addView(testReminder, matchWrap(dp(8)));
         body.addView(notifyCard, matchWrap(0));
 
         body.addView(text("Most recent 100 draws (all " + stats.totalDraws + " are used for predictions)", 12, MUTED),

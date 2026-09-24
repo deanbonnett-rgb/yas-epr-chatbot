@@ -51,8 +51,12 @@ public final class Game {
      * dated the morning after the US draw). Such dates are moved back to the previous draw day.
      */
     public final boolean snapToDrawDay;
-    /** Extra line about draw times for UK players, or null. */
+    /** Extra line about how the draws work (UK Powerball times, Lotto's two rounds), or null. */
     public final String drawNote;
+    /** Caveat about the bundled history when it isn't complete, or null. */
+    public final String historyNote;
+    /** Date from which two draws are made each night (Lotto's rounds), or null. */
+    private final String twoRoundsFrom;
     public final String jackpotOdds;
     public final int accent;
     public final int extraColor;
@@ -65,7 +69,7 @@ public final class Game {
         eraStarts = b.eraStarts; mainPools = b.mainPools; extraPools = b.extraPools;
         drawDays = b.drawDays; timeZone = TimeZone.getTimeZone(b.timeZone);
         resultsHour = b.resultsHour; resultsMinute = b.resultsMinute; usDates = b.usDates;
-        snapToDrawDay = b.snapToDrawDay; drawNote = b.drawNote;
+        snapToDrawDay = b.snapToDrawDay; drawNote = b.drawNote; historyNote = b.historyNote; twoRoundsFrom = b.twoRoundsFrom;
         jackpotOdds = b.jackpotOdds; accent = b.accent; extraColor = b.extraColor; sources = b.sources;
     }
 
@@ -74,7 +78,8 @@ public final class Game {
             .eras(new String[]{"2004-02-13", "2011-05-10", "2016-09-27"}, new int[]{50, 50, 50}, new int[]{9, 11, 12})
             .schedule("Europe/London", 21, 30, Calendar.TUESDAY, Calendar.FRIDAY)
             .look("1 in 139,838,160", 0xFF3D7BFF, 0xFFF5C518)
-            .sources(new Source("https://www.national-lottery.co.uk/results/euromillions/draw-history/csv", Mode.APPEND_NEWER),
+            .sources(new Source(nationalLottery(33), Mode.APPEND_NEWER),
+                    new Source("https://www.national-lottery.co.uk/results/euromillions/draw-history/csv", Mode.APPEND_NEWER),
                     new Source("https://raw.githubusercontent.com/daowa89/lottery-archive/main/eu/euromillions/results.csv", Mode.APPEND_NEWER),
                     new Source("https://lottery.merseyworld.com/cgi-bin/lottery?days=20&Machine=Z&Ballset=0&order=1&show=1&year=0&display=CSV", Mode.FILL))
             .build();
@@ -83,8 +88,11 @@ public final class Game {
             .balls(6, 1, false, true, "Bonus Ball")
             .eras(new String[]{"1994-11-19", "2015-10-10"}, new int[]{49, 59}, new int[]{49, 59})
             .schedule("Europe/London", 21, 30, Calendar.WEDNESDAY, Calendar.SATURDAY)
-            .look("1 in 45,057,474", 0xFFE5007E, 0xFF9AA3C0)
-            .sources(new Source("https://www.national-lottery.co.uk/results/lotto/draw-history/csv", Mode.APPEND_NEWER),
+            .look("1 in 45,057,474 per round", 0xFFE5007E, 0xFF9AA3C0)
+            .note("Two draws (rounds) each night since 10 Jun 2026 – every line plays in both")
+            .twoRoundsFrom("2026-06-10")
+            .sources(new Source(nationalLottery(1), Mode.APPEND_NEWER),
+                    new Source("https://www.national-lottery.co.uk/results/lotto/draw-history/csv", Mode.APPEND_NEWER),
                     new Source("https://lotto.merseyworld.com/cgi-bin/lottery?days=2&Machine=Z&Ballset=0&order=1&show=1&year=0&display=CSV", Mode.FILL))
             .build();
 
@@ -100,7 +108,41 @@ public final class Game {
                     new Source("https://www.national-lottery.co.uk/results/powerball/draw-history/csv", Mode.APPEND_NEWER))
             .build();
 
-    public static final Game[] ALL = {EUROMILLIONS, LOTTO, POWERBALL};
+    public static final Game SET_FOR_LIFE = new Builder("set_for_life", "Set For Life", "UK National Lottery")
+            .balls(5, 1, true, false, "Life Ball")
+            .eras(new String[]{"2019-03-18"}, new int[]{47}, new int[]{10})
+            .schedule("Europe/London", 21, 0, Calendar.MONDAY, Calendar.THURSDAY)
+            .look("1 in 15,339,390", 0xFF00A3AD, 0xFF00A3AD)
+            .sources(new Source("https://raw.githubusercontent.com/apkelepouris/predict-for-life-data/main/set_for_life.csv", Mode.APPEND_NEWER),
+                    new Source(nationalLottery(3), Mode.APPEND_NEWER))
+            .build();
+
+    public static final Game THUNDERBALL = new Builder("thunderball", "Thunderball", "UK National Lottery")
+            .balls(5, 1, true, false, "Thunderball")
+            .eras(new String[]{"1999-06-12", "2010-05-09"}, new int[]{34, 39}, new int[]{14, 14})
+            .schedule("Europe/London", 21, 0, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.FRIDAY, Calendar.SATURDAY)
+            .look("1 in 8,060,598", 0xFF7B3FC4, 0xFF7B3FC4)
+            .history("Uses the 314 draws available (Dec 2021 – Jun 2022 and Sep 2025 onwards) and adds every new draw")
+            .sources(new Source(nationalLottery(4), Mode.APPEND_NEWER),
+                    new Source("https://www.national-lottery.co.uk/results/thunderball/draw-history/csv", Mode.APPEND_NEWER))
+            .build();
+
+    public static final Game[] ALL = {EUROMILLIONS, LOTTO, SET_FOR_LIFE, THUNDERBALL, POWERBALL};
+
+    /** The National Lottery's results download (last 180 days) for a game id. */
+    private static String nationalLottery(int gameId) {
+        return "https://api-dfe.national-lottery.co.uk/draw-game/results/" + gameId + "/download?interval=ONE_EIGHTY";
+    }
+
+    /** Number of draws made on a draw night. */
+    public int drawsOn(String isoDate) {
+        return twoRoundsFrom != null && isoDate.compareTo(twoRoundsFrom) >= 0 ? 2 : 1;
+    }
+
+    public boolean hasFillSource() {
+        for (Source s : sources) if (s.mode == Mode.FILL) return true;
+        return false;
+    }
 
     public static Game byId(String id) {
         for (Game g : ALL) if (g.id.equals(id)) return g;
@@ -163,7 +205,7 @@ public final class Game {
         final String id, name, country;
         int mainCount, extraCount;
         boolean extraPicked, extraFromMainDrum, usDates, snapToDrawDay;
-        String drawNote;
+        String drawNote, historyNote, twoRoundsFrom;
         String extraName, timeZone, jackpotOdds;
         String[] eraStarts;
         int[] mainPools, extraPools, drawDays;
@@ -189,6 +231,12 @@ public final class Game {
         Builder usDates() { usDates = true; return this; }
 
         Builder ukTiming(String note) { drawNote = note; snapToDrawDay = true; return this; }
+
+        Builder note(String note) { drawNote = note; return this; }
+
+        Builder history(String note) { historyNote = note; return this; }
+
+        Builder twoRoundsFrom(String date) { twoRoundsFrom = date; return this; }
 
         Builder sources(Source... s) { sources = s; return this; }
 

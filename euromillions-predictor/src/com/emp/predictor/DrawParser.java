@@ -23,7 +23,9 @@ public final class DrawParser {
     private static final String[] MONTHS = {"jan", "feb", "mar", "apr", "may", "jun",
             "jul", "aug", "sep", "oct", "nov", "dec"};
     private static final Pattern EXTRA_COL = Pattern.compile(
-            "(lucky )?stars?( ?\\d+)?|s\\d+|l\\d+|e\\d+|bonus( ball)?|bn|powerball|pb|red_?ball");
+            "(lucky )?stars?( ?\\d+)?|s\\d+|l\\d+|e\\d+|bonus( ball)?|bn|powerball|pb|red_?ball|life( ?ball)?|thunderball|tb");
+    /** "Round 2 Ball 1" -> "ball 1", for results files that put both Lotto rounds on one row. */
+    private static final Pattern ROUND_PREFIX = Pattern.compile("^(round|rnd|r) ?\\d+ ?[-_:]? ?");
     private static final Pattern MAIN_COL = Pattern.compile(
             "(ball|n|wb|number) ?_?\\d+|white_?balls|winning numbers");
     private static final Pattern MERSEY_HEADER = Pattern.compile("^\\s*No\\.,\\s*Day,\\s*DD,\\s*MMM,\\s*YYYY,");
@@ -50,7 +52,7 @@ public final class DrawParser {
         List<Integer> mainCols = new ArrayList<>();
         List<Integer> extraCols = new ArrayList<>();
         for (int i = 0; i < cols.length; i++) {
-            String c = cols[i].trim().toLowerCase(Locale.ROOT);
+            String c = ROUND_PREFIX.matcher(cols[i].trim().toLowerCase(Locale.ROOT)).replaceFirst("");
             if (dateCol < 0 && c.contains("date")) dateCol = i;
             else if (EXTRA_COL.matcher(c).matches()) extraCols.add(i);
             else if (MAIN_COL.matcher(c).matches()) mainCols.add(i);
@@ -70,11 +72,22 @@ public final class DrawParser {
                     extra = new ArrayList<>(main.subList(game.mainCount, main.size()));
                     main = new ArrayList<>(main.subList(0, game.mainCount));
                 }
-                add(out, game, normaliseDate(f[dateCol], game.usDates), main, extra);
+                String date = normaliseDate(f[dateCol], game.usDates);
+                int rounds = main.size() / game.mainCount;
+                if (rounds > 1 && main.size() == rounds * game.mainCount && extra.size() == rounds * game.extraCount) {
+                    // Several draws on one row (Lotto's two rounds): split them in column order.
+                    for (int r = 0; r < rounds; r++) {
+                        add(out, game, date, main.subList(r * game.mainCount, (r + 1) * game.mainCount),
+                                extra.subList(r * game.extraCount, (r + 1) * game.extraCount));
+                    }
+                } else {
+                    add(out, game, date, main, extra);
+                }
             } catch (RuntimeException ignored) {
                 // Skip malformed rows rather than failing the whole file.
             }
         }
+        Collections.sort(out);
         return out;
     }
 
@@ -157,25 +170,40 @@ public final class DrawParser {
     }
 
     /**
-     * Merges downloaded draws into {@code base}. Stored draws are never replaced. A download that
-     * repeats a neighbouring draw's numbers under another date is ignored.
+     * Merges downloaded draws into {@code base}. Stored draws are never replaced: a date only takes
+     * as many draws as were made that night (two Lotto rounds since June 2026, otherwise one). A
+     * download that repeats a neighbouring draw's numbers under another date is ignored.
      */
-    public static List<Draw> merge(List<Draw> base, List<Draw> incoming, Game.Mode mode) {
-        TreeMap<String, Draw> byDate = new TreeMap<>();
-        for (Draw d : base) byDate.put(d.date, d);
+    public static List<Draw> merge(List<Draw> base, List<Draw> incoming, Game game, Game.Mode mode) {
+        TreeMap<String, List<Draw>> byDate = new TreeMap<>();
+        for (Draw d : base) put(byDate, d);
         String last = byDate.isEmpty() ? "" : byDate.lastKey();
         List<Draw> sorted = new ArrayList<>(incoming);
         Collections.sort(sorted);
         for (Draw d : sorted) {
-            if (byDate.containsKey(d.date)) continue;
-            if (mode == Game.Mode.APPEND_NEWER && d.date.compareTo(last) <= 0) continue;
-            Map.Entry<String, Draw> before = byDate.lowerEntry(d.date);
-            Map.Entry<String, Draw> after = byDate.higherEntry(d.date);
-            if (before != null && before.getValue().sameNumbers(d)) continue;
-            if (after != null && after.getValue().sameNumbers(d)) continue;
-            byDate.put(d.date, d);
+            List<Draw> sameDay = byDate.get(d.date);
+            if (sameDay != null && (sameDay.size() >= game.drawsOn(d.date) || containsNumbers(sameDay, d))) continue;
+            if (mode == Game.Mode.APPEND_NEWER && d.date.compareTo(last) < 0) continue;
+            Map.Entry<String, List<Draw>> before = byDate.lowerEntry(d.date);
+            Map.Entry<String, List<Draw>> after = byDate.higherEntry(d.date);
+            if (before != null && containsNumbers(before.getValue(), d)) continue;
+            if (after != null && containsNumbers(after.getValue(), d)) continue;
+            put(byDate, d);
         }
-        return new ArrayList<>(byDate.values());
+        List<Draw> out = new ArrayList<>();
+        for (List<Draw> day : byDate.values()) out.addAll(day);
+        return out;
+    }
+
+    private static void put(TreeMap<String, List<Draw>> byDate, Draw d) {
+        List<Draw> day = byDate.get(d.date);
+        if (day == null) byDate.put(d.date, day = new ArrayList<>());
+        day.add(d);
+    }
+
+    private static boolean containsNumbers(List<Draw> draws, Draw d) {
+        for (Draw o : draws) if (o.sameNumbers(d)) return true;
+        return false;
     }
 
     public static void write(List<Draw> draws, Game game, Writer w) throws IOException {
