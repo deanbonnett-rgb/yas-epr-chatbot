@@ -1,33 +1,63 @@
 package com.emp.predictor;
 
 import java.util.Calendar;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
-/** Knows when EuroMillions results should be available, so background checks only go online when needed. */
+/** Knows when each game's results should be available, so background checks only go online when needed. */
 public final class DrawSchedule {
-    public static final TimeZone UK = TimeZone.getTimeZone("Europe/London");
-    /** Draws are made at about 20:45 UK time; allow time for the results to be published. */
-    static final int RESULTS_HOUR = 21;
-    static final int RESULTS_MINUTE = 30;
-
     private DrawSchedule() {}
 
-    /** Date (yyyy-MM-dd) of the most recent Tuesday/Friday draw whose results should be out by {@code nowMillis}. */
-    public static String latestExpectedDraw(long nowMillis) {
-        Calendar c = Calendar.getInstance(UK, Locale.UK);
+    /** Date (yyyy-MM-dd) of the most recent regular draw whose results should be out by {@code nowMillis}. */
+    public static String latestExpectedDraw(Game game, long nowMillis) {
+        Calendar c = Calendar.getInstance(game.timeZone, Locale.UK);
         c.setTimeInMillis(nowMillis);
         int minutes = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
-        if (minutes < RESULTS_HOUR * 60 + RESULTS_MINUTE) c.add(Calendar.DAY_OF_MONTH, -1);
-        while (c.get(Calendar.DAY_OF_WEEK) != Calendar.TUESDAY && c.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY) {
-            c.add(Calendar.DAY_OF_MONTH, -1);
-        }
+        if (minutes < game.resultsHour * 60 + game.resultsMinute) c.add(Calendar.DAY_OF_MONTH, -1);
+        while (!isDrawDay(game, c.get(Calendar.DAY_OF_WEEK))) c.add(Calendar.DAY_OF_MONTH, -1);
         return String.format(Locale.ROOT, "%04d-%02d-%02d",
                 c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
 
     /** True when a draw should have been published that we don't have yet. */
-    public static boolean updateDue(String lastKnownDraw, long nowMillis) {
-        return latestExpectedDraw(nowMillis).compareTo(lastKnownDraw) > 0;
+    public static boolean updateDue(Game game, String lastKnownDraw, long nowMillis) {
+        return latestExpectedDraw(game, nowMillis).compareTo(lastKnownDraw) > 0;
+    }
+
+    /**
+     * True if two consecutive stored draws are more than {@link #MAX_GAP_DAYS} apart, which never
+     * happens in a complete history (the longest regular gap is a week).
+     */
+    public static boolean hasGap(List<Draw> draws) {
+        for (int i = 1; i < draws.size(); i++) {
+            if (daysBetween(draws.get(i - 1).date, draws.get(i).date) > MAX_GAP_DAYS) return true;
+        }
+        return false;
+    }
+
+    public static final int MAX_GAP_DAYS = 10;
+
+    /** Draws are missing: a hole in the history, or it ends well before the latest draw. */
+    public static boolean drawsMissing(Game game, List<Draw> draws, long nowMillis) {
+        if (draws.isEmpty() || hasGap(draws)) return true;
+        String last = draws.get(draws.size() - 1).date;
+        return daysBetween(last, latestExpectedDraw(game, nowMillis)) > MAX_GAP_DAYS;
+    }
+
+    public static long daysBetween(String a, String b) {
+        return (epochDay(b) - epochDay(a));
+    }
+
+    private static long epochDay(String iso) {
+        Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.UK);
+        c.clear();
+        c.set(Integer.parseInt(iso.substring(0, 4)), Integer.parseInt(iso.substring(5, 7)) - 1, Integer.parseInt(iso.substring(8, 10)));
+        return c.getTimeInMillis() / 86400000L;
+    }
+
+    private static boolean isDrawDay(Game game, int dayOfWeek) {
+        for (int d : game.drawDays) if (d == dayOfWeek) return true;
+        return false;
     }
 }

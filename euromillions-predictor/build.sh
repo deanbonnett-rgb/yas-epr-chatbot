@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 SDK_JAR=build/android-34.jar
-OUT=release/EuroMillionsPredictor.apk
+OUT=release/LotteryPredictor.apk
 KEYSTORE=keystore/predictor.jks
 KEY_PASS=euromillions
 

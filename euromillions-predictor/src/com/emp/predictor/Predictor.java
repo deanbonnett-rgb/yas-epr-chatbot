@@ -27,22 +27,27 @@ public final class Predictor {
     private static final int MAX_ATTEMPTS = 500;
 
     public static final class Line {
+        public final Game game;
         public final int[] main;
-        public final int[] stars;
+        /** Empty for Lotto, where players don't choose the bonus ball. */
+        public final int[] extra;
         /** Average historical appearance rate of the chosen numbers (0..1). */
         public final double mainRate;
-        public final double starRate;
+        public final double extraRate;
 
-        Line(int[] main, int[] stars, double mainRate, double starRate) {
+        Line(Game game, int[] main, int[] extra, double mainRate, double extraRate) {
+            this.game = game;
             this.main = main;
-            this.stars = stars;
+            this.extra = extra;
             this.mainRate = mainRate;
-            this.starRate = starRate;
+            this.extraRate = extraRate;
         }
 
         /** Plain text for the clipboard, e.g. "3, 17, 22, 41, 48 | Lucky Stars: 5, 11". */
         public String toClipboardText() {
-            return join(main) + " | Lucky Stars: " + join(stars);
+            String s = join(main);
+            if (extra.length > 0) s += " | " + game.extraName + ": " + join(extra);
+            return s;
         }
 
         private static String join(int[] nums) {
@@ -55,52 +60,47 @@ public final class Predictor {
         }
 
         String key() {
-            return Arrays.toString(main) + Arrays.toString(stars);
+            return Arrays.toString(main) + Arrays.toString(extra);
         }
     }
 
     private final Stats stats;
+    private final Game game;
     private final Random random;
 
     public Predictor(Stats stats, Random random) {
         this.stats = stats;
+        this.game = stats.game;
         this.random = random;
     }
 
     public double[] mainWeights(int strategy) {
-        double[] hot = new double[Stats.MAIN_MAX + 1];
-        double[] recent = new double[Stats.MAIN_MAX + 1];
-        double[] overdue = new double[Stats.MAIN_MAX + 1];
-        for (int n = 1; n <= Stats.MAIN_MAX; n++) {
-            hot[n] = stats.mainProbability(n);
-            recent[n] = stats.mainRecent[n] + 1;
-            overdue[n] = stats.mainGap[n] + 1;
-        }
-        return finish(strategy, hot, recent, overdue);
+        return weights(stats.main, strategy);
     }
 
-    public double[] starWeights(int strategy) {
-        double[] hot = new double[Stats.STAR_MAX + 1];
-        double[] recent = new double[Stats.STAR_MAX + 1];
-        double[] overdue = new double[Stats.STAR_MAX + 1];
-        for (int s = 1; s <= Stats.STAR_MAX; s++) {
-            hot[s] = stats.starProbability(s);
-            recent[s] = stats.starRecent[s] + 1;
-            overdue[s] = stats.starGap[s] + 1;
-        }
-        return finish(strategy, hot, recent, overdue);
+    public double[] extraWeights(int strategy) {
+        return weights(stats.extra, strategy);
     }
 
-    private static double[] finish(int strategy, double[] hot, double[] recent, double[] overdue) {
+    /** Weights for numbers 1..today's pool (index 0 unused), summing to 1. */
+    private static double[] weights(Stats.Balls b, int strategy) {
+        double[] hot = new double[b.pool + 1];
+        double[] recent = new double[b.pool + 1];
+        double[] overdue = new double[b.pool + 1];
+        for (int n = 1; n <= b.pool; n++) {
+            hot[n] = b.probability(n);
+            recent[n] = b.recent[n] + 1;
+            overdue[n] = b.gap[n] + 1;
+        }
         double[] w;
         switch (strategy) {
             case HOT: w = normalise(hot); break;
             case RECENT: w = normalise(recent); break;
             case OVERDUE: w = normalise(overdue); break;
             default:
-                double[] a = normalise(hot), b = normalise(recent), c = normalise(overdue);
-                w = new double[a.length];
-                for (int i = 1; i < w.length; i++) w[i] = (a[i] + b[i] + c[i]) / 3;
+                double[] x = normalise(hot), y = normalise(recent), z = normalise(overdue);
+                w = new double[x.length];
+                for (int i = 1; i < w.length; i++) w[i] = (x[i] + y[i] + z[i]) / 3;
         }
         for (int i = 1; i < w.length; i++) w[i] = Math.pow(w[i] * (w.length - 1), EMPHASIS);
         return normalise(w);
@@ -116,28 +116,30 @@ public final class Predictor {
     }
 
     /**
-     * Generates {@code count} distinct lines. With {@code typicalOnly}, lines whose ball total falls
-     * outside the middle 90% of past draws, or which are all odd / all even, are redrawn.
+     * Generates {@code count} distinct lines. With {@code typicalOnly}, lines whose main-number total
+     * falls outside the middle 90% of draws under today's rules, or which are all odd / all even,
+     * are redrawn.
      */
     public List<Line> generate(int count, int strategy, boolean typicalOnly) {
         double[] mw = mainWeights(strategy);
-        double[] sw = starWeights(strategy);
+        double[] ew = extraWeights(strategy);
         int lowSum = stats.sumPercentile(0.05);
         int highSum = stats.sumPercentile(0.95);
+        int extraPicks = game.extraPicked ? game.extraCount : 0;
 
         List<Line> lines = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         int attempts = 0;
         while (lines.size() < count) {
             attempts++;
-            int[] main = pick(mw, 5);
-            int[] stars = pick(sw, 2);
+            int[] main = pick(mw, game.mainCount);
+            int[] extra = pick(ew, extraPicks);
             boolean relaxed = attempts > MAX_ATTEMPTS * count;
             if (typicalOnly && !relaxed && !isTypical(main, lowSum, highSum)) continue;
-            double mr = 0, sr = 0;
-            for (int n : main) mr += stats.mainProbability(n) / 5;
-            for (int s : stars) sr += stats.starProbability(s) / 2;
-            Line line = new Line(main, stars, mr, sr);
+            double mr = 0, er = 0;
+            for (int n : main) mr += stats.main.probability(n) / main.length;
+            for (int e : extra) er += stats.extra.probability(e) / extra.length;
+            Line line = new Line(game, main, extra, mr, er);
             if (seen.add(line.key())) lines.add(line);
         }
         return lines;
@@ -149,7 +151,7 @@ public final class Predictor {
             sum += n;
             if (n % 2 == 1) odd++;
         }
-        return sum >= lowSum && sum <= highSum && odd >= 1 && odd <= 4;
+        return sum >= lowSum && sum <= highSum && odd >= 1 && odd <= main.length - 1;
     }
 
     /** Weighted sampling without replacement; returns sorted numbers. */
