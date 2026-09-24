@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud_firestore {
+  match /databases/{database}/documents {
+    // Each list lives at /lists/{code}. Only someone who knows the 10-character
+    // code can open it, and nobody can browse the list of all lists.
+    match /lists/{code} {
+      allow get, create, update: if code.size() >= 10;
+
+      match /items/{itemId} {
+        allow read, write: if code.size() >= 10;
+      }
+    }
+  }
+}

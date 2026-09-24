@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2f7d4f">
+  <title>Our Shopping List</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <style>
+    :root {
+      --bg: #f6f7f4; --card: #fff; --text: #1d2420; --muted: #6b746e;
+      --line: #e3e6e1; --accent: #2f7d4f; --accent-soft: #e4f1e8; --warn: #9a5b00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121513; --card: #1c211e; --text: #e8ece9; --muted: #98a29b;
+        --line: #2c332e; --accent: #5cc189; --accent-soft: #1f3327; --warn: #e0a24a;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text);
+      font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 16px 16px 96px; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    h1 { font-size: 22px; margin: 0; }
+    button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
+    .icon-btn { background: transparent; color: var(--muted); padding: 8px; font-size: 22px; line-height: 1; }
+
+    /* Use-by date banner */
+    .date-card { background: var(--accent); color: #fff; border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+    @media (prefers-color-scheme: dark) { .date-card { color: #0d1a12; } }
+    .date-label { font-size: 14px; opacity: .9; }
+    .date-value { font-size: 30px; font-weight: 700; margin: 2px 0; display: block; background: none;
+      color: inherit; padding: 0; text-align: left; }
+    .date-sub { font-size: 14px; opacity: .9; }
+    .date-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .chip { background: rgba(255,255,255,.2); color: inherit; padding: 8px 12px; font-size: 15px; }
+    .chip:active { background: rgba(255,255,255,.35); }
+    #datePicker { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+
+    /* Add item */
+    form.add { display: flex; gap: 8px; margin-bottom: 16px; }
+    form.add input { flex: 1; min-width: 0; font: inherit; padding: 12px 14px; border-radius: 12px;
+      border: 1px solid var(--line); background: var(--card); color: var(--text); }
+    form.add button { background: var(--accent); color: #fff; padding: 0 18px; font-weight: 600; }
+    @media (prefers-color-scheme: dark) { form.add button { color: #0d1a12; } }
+
+    /* Items */
+    ul { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: 14px;
+      border: 1px solid var(--line); overflow: hidden; }
+    ul:empty { display: none; }
+    li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+    li:first-child { border-top: 0; }
+    .tick { width: 28px; height: 28px; flex: none; border-radius: 50%; border: 2px solid var(--muted);
+      background: transparent; display: grid; place-items: center; color: #fff; font-size: 16px; padding: 0; }
+    li.got .tick { background: var(--accent); border-color: var(--accent); }
+    .name { flex: 1; word-break: break-word; }
+    li.got .name { text-decoration: line-through; color: var(--muted); }
+    .del { background: transparent; color: var(--muted); font-size: 20px; padding: 4px 8px; }
+    .section-title { display: flex; justify-content: space-between; align-items: center;
+      color: var(--muted); font-size: 14px; margin: 20px 4px 8px; }
+    .link-btn { background: none; color: var(--accent); padding: 4px; font-size: 14px; font-weight: 600; }
+    .empty { text-align: center; color: var(--muted); padding: 32px 0; }
+
+    .banner { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--warn);
+      border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+    .status { font-size: 12px; color: var(--muted); }
+
+    /* Settings sheet */
+    dialog { border: 0; border-radius: 16px; padding: 20px; background: var(--card); color: var(--text);
+      width: min(92vw, 420px); }
+    dialog::backdrop { background: rgba(0,0,0,.4); }
+    dialog h2 { margin: 0 0 8px; font-size: 18px; }
+    dialog p { color: var(--muted); font-size: 14px; margin: 6px 0 12px; }
+    .code { font: 600 22px ui-monospace, monospace; letter-spacing: 2px; background: var(--accent-soft);
+      padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 10px; }
+    dialog input { width: 100%; font: inherit; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); margin-bottom: 8px; }
+    .row { display: flex; gap: 8px; }
+    .btn { background: var(--accent); color: #fff; padding: 10px 14px; flex: 1; font-weight: 600; }
+    .btn.secondary { background: var(--accent-soft); color: var(--accent); }
+    @media (prefers-color-scheme: dark) { .btn { color: #0d1a12; } .btn.secondary { color: var(--accent); } }
+    hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🛒 Our Shopping List</h1>
+    <button class="icon-btn" id="settingsBtn" aria-label="Share &amp; settings">⚙︎</button>
+  </header>
+
+  <div id="demoBanner" class="banner" hidden>
+    Demo mode: this list is only saved on this phone. Add your Firebase settings (see README) to share it.
+  </div>
+
+  <section class="date-card" aria-live="polite">
+    <div class="date-label">Look for use-by dates on or after</div>
+    <button class="date-value" id="dateValue" aria-label="Change date">Pick a date</button>
+    <div class="date-sub" id="dateSub">Tap the date to change it</div>
+    <div class="date-actions">
+      <button class="chip" data-days="7">1 week from today</button>
+      <button class="chip" data-days="5">+5 days</button>
+      <button class="chip" data-days="10">+10 days</button>
+      <button class="chip" id="pickBtn">📅 Choose…</button>
+    </div>
+    <input type="date" id="datePicker" tabindex="-1" aria-hidden="true">
+  </section>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <input id="addInput" placeholder="Add an item, e.g. Milk" enterkeyhint="done" aria-label="New item">
+    <button type="submit">Add</button>
+  </form>
+
+  <ul id="todoList"></ul>
+  <div class="empty" id="emptyMsg" hidden>Nothing on the list yet.</div>
+
+  <div class="section-title" id="gotHeader" hidden>
+    <span id="gotCount">Got</span>
+    <button class="link-btn" id="clearGot">Clear ticked</button>
+  </div>
+  <ul id="gotList"></ul>
+
+  <p class="status" id="status"></p>
+</main>
+
+<dialog id="settings">
+  <h2>Share this list</h2>
+  <p>Send this link to your partner. When they open it, you'll both see the same list.</p>
+  <div class="code" id="listCode">—</div>
+  <div class="row">
+    <button class="btn" id="shareBtn">Share link</button>
+    <button class="btn secondary" id="copyBtn">Copy link</button>
+  </div>
+  <hr>
+  <h2>Join a different list</h2>
+  <p>Got a code from your partner? Enter it here.</p>
+  <input id="joinInput" placeholder="List code" autocapitalize="characters">
+  <div class="row">
+    <button class="btn secondary" id="closeSettings">Close</button>
+    <button class="btn" id="joinBtn">Join</button>
+  </div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
