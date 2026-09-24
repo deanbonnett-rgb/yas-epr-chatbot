@@ -1,4 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js?v=3";
+
+// Bump this (and the ?v= in index.html and sw.js) with each update so phones never
+// mix an old app.js with a new index.html.
+const VERSION = 3;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
@@ -301,7 +305,7 @@ async function start() {
       if ($("history").open) renderHistory();
     },
     (list) => { items = list; renderItems(); },
-    (msg) => { $("status").textContent = msg; },
+    (msg) => { $("status").textContent = `${msg} · v${VERSION}`; },
   );
 }
 
