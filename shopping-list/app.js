@@ -1,8 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js?v=3";
+import { firebaseConfig } from "./firebase-config.js?v=4";
 
 // Bump this (and the ?v= in index.html and sw.js) with each update so phones never
 // mix an old app.js with a new index.html.
-const VERSION = 3;
+const VERSION = 4;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
@@ -61,21 +61,28 @@ async function firebaseStore(code) {
       }, (err) => onStatus("Sync error: " + err.message));
     },
     setDate: (iso) => fs.setDoc(listRef, { lookFor: iso }, { merge: true }),
-    add: (name) => fs.addDoc(itemsRef, { name, got: false, createdAt: Date.now() }),
+    add: (name, order) => fs.addDoc(itemsRef, { name, got: false, createdAt: Date.now(), order }),
     setGot: (id, got) => fs.updateDoc(fs.doc(itemsRef, id), { got }),
+    // Changes an item and remembers its place in the shop under its name.
+    async update(id, data, name, order) {
+      const batch = fs.writeBatch(db);
+      batch.update(fs.doc(itemsRef, id), data);
+      batch.set(listRef, { shopOrder: { [orderKey(name)]: order } }, { merge: true });
+      await batch.commit();
+    },
     remove: (id) => fs.deleteDoc(fs.doc(itemsRef, id)),
     // Batched writes (not transactions) so these still work with no signal in the shop.
-    async finishShop(ids, pastShops) {
+    async finishShop(ids, pastShops, orders) {
       const batch = fs.writeBatch(db);
-      batch.set(listRef, { history: pastShops }, { merge: true });
+      batch.set(listRef, { history: pastShops, shopOrder: orders }, { merge: true });
       ids.forEach((id) => batch.delete(fs.doc(itemsRef, id)));
       await batch.commit();
     },
     setHistory: (pastShops) => fs.setDoc(listRef, { history: pastShops }, { merge: true }),
-    async addMany(names) {
+    async addMany(entries) {
       const batch = fs.writeBatch(db);
       const now = Date.now();
-      names.forEach((name, i) => batch.set(fs.doc(itemsRef), { name, got: false, createdAt: now + i }));
+      entries.forEach(({ name, order }, i) => batch.set(fs.doc(itemsRef), { name, got: false, createdAt: now + i, order }));
       await batch.commit();
     },
   };
@@ -89,20 +96,30 @@ function localStore(code) {
   let listeners = null;
   const save = () => {
     storageSet(key, JSON.stringify(state));
-    listeners?.onMeta({ lookFor: state.lookFor, history: state.history });
+    listeners?.onMeta({ lookFor: state.lookFor, history: state.history, shopOrder: state.shopOrder });
     listeners?.onItems(state.items.slice());
   };
   return {
     subscribe(onMeta, onItems, onStatus) { listeners = { onMeta, onItems }; onStatus("Saved on this phone only"); save(); },
     setDate(iso) { state.lookFor = iso; save(); },
-    add(name) { state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: Date.now() }); save(); },
+    add(name, order) { state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: Date.now(), order }); save(); },
+    update(id, data, name, order) {
+      Object.assign(state.items.find((i) => i.id === id) || {}, data);
+      state.shopOrder = { ...state.shopOrder, [orderKey(name)]: order };
+      save();
+    },
     setGot(id, got) { const it = state.items.find((i) => i.id === id); if (it) it.got = got; save(); },
     remove(id) { state.items = state.items.filter((i) => i.id !== id); save(); },
-    finishShop(ids, pastShops) { state.items = state.items.filter((i) => !ids.includes(i.id)); state.history = pastShops; save(); },
+    finishShop(ids, pastShops, orders) {
+      state.items = state.items.filter((i) => !ids.includes(i.id));
+      state.history = pastShops;
+      state.shopOrder = { ...state.shopOrder, ...orders };
+      save();
+    },
     setHistory(pastShops) { state.history = pastShops; save(); },
-    addMany(names) {
+    addMany(entries) {
       const now = Date.now();
-      names.forEach((name, i) => state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: now + i }));
+      entries.forEach(({ name, order }, i) => state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: now + i, order }));
       save();
     },
   };
@@ -116,6 +133,14 @@ const MAX_HISTORY = 20;
 let store;
 let items = [];
 let pastShops = []; // past shops, newest first: { id, at, lookFor, items: [names] }
+let shopOrder = {}; // remembered position for each item name, so re-added items go back to their spot
+let busy = false; // true while dragging or editing, so a sync from the other phone doesn't wipe it
+
+// Items are sorted by `order`. It's a plain number: new items get the current time
+// (so they go to the bottom), and dragging sets it halfway between the new neighbours.
+function orderKey(name) { return name.trim().toLowerCase(); }
+const orderOf = (i) => i.order ?? i.createdAt;
+const orderFor = (name) => shopOrder[orderKey(name)] ?? Date.now();
 
 function renderDate(iso) {
   if (!iso) {
@@ -137,6 +162,12 @@ function renderDate(iso) {
 function itemRow(item) {
   const li = document.createElement("li");
   li.className = item.got ? "got" : "";
+  li.dataset.id = item.id;
+  const handle = document.createElement("span");
+  handle.className = "handle";
+  handle.textContent = "⠿";
+  handle.setAttribute("aria-label", "Drag to reorder " + item.name);
+  handle.onpointerdown = (e) => startDrag(e, li);
   const tick = document.createElement("button");
   tick.className = "tick";
   tick.textContent = item.got ? "✓" : "";
@@ -151,13 +182,97 @@ function itemRow(item) {
   del.textContent = "✕";
   del.setAttribute("aria-label", "Delete " + item.name);
   del.onclick = () => store.remove(item.id);
-  li.append(tick, name, del);
+  const edit = document.createElement("button");
+  edit.className = "del";
+  edit.textContent = "✎";
+  edit.setAttribute("aria-label", "Edit " + item.name);
+  edit.onclick = () => startEdit(li, item, name);
+  if (item.got) li.append(tick, name, del);
+  else li.append(handle, tick, name, edit, del);
   return li;
 }
 
+function startEdit(li, item, nameEl) {
+  busy = true;
+  const input = document.createElement("input");
+  input.className = "edit";
+  input.value = item.name;
+  input.setAttribute("aria-label", "Item name");
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    busy = false;
+    const newName = input.value.trim();
+    if (save && newName && newName !== item.name) {
+      item.name = newName; // show it straight away; the sync confirms it
+      store.update(item.id, { name: newName }, newName, orderOf(item));
+    }
+    renderItems();
+  };
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") finish(true);
+    if (e.key === "Escape") finish(false);
+  };
+  input.onblur = () => finish(true);
+}
+
+// Drag by the ⠿ handle. Uses pointer events so it works with a finger, not just a mouse.
+function startDrag(e, li) {
+  e.preventDefault();
+  busy = true;
+  const list = $("todoList");
+  li.classList.add("dragging");
+  let lastY = e.clientY;
+
+  // Scroll the page when dragging near the top or bottom of the screen.
+  const scroller = setInterval(() => {
+    if (lastY < 90) window.scrollBy(0, -12);
+    else if (lastY > window.innerHeight - 90) window.scrollBy(0, 12);
+    else return;
+    moveTo(lastY);
+  }, 16);
+
+  function moveTo(y) {
+    const others = [...list.children].filter((r) => r !== li);
+    const before = others.find((r) => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+    if (before !== li.nextElementSibling) list.insertBefore(li, before || null);
+  }
+  const onMove = (ev) => { lastY = ev.clientY; moveTo(lastY); };
+  // Listen on the whole page: moving the row in the list drops pointer capture.
+  const onUp = () => {
+    clearInterval(scroller);
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onUp);
+    li.classList.remove("dragging");
+    busy = false;
+
+    const byId = (el) => el && items.find((i) => i.id === el.dataset.id);
+    const item = byId(li), prev = byId(li.previousElementSibling), next = byId(li.nextElementSibling);
+    let order;
+    if (prev && next) order = (orderOf(prev) + orderOf(next)) / 2;
+    else if (prev) order = orderOf(prev) + 1000;
+    else if (next) order = orderOf(next) - 1000;
+    if (item && order !== undefined && order !== orderOf(item)) {
+      item.order = order; // show it straight away; the sync confirms it
+      store.update(item.id, { order }, item.name, order);
+    }
+    renderItems();
+  };
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onUp);
+}
+
 function renderItems() {
-  const todo = items.filter((i) => !i.got);
-  const got = items.filter((i) => i.got);
+  if (busy) return;
+  const sorted = items.slice().sort((a, b) => orderOf(a) - orderOf(b));
+  const todo = sorted.filter((i) => !i.got);
+  const got = sorted.filter((i) => i.got);
   $("todoList").replaceChildren(...todo.map(itemRow));
   $("gotList").replaceChildren(...got.map(itemRow));
   $("emptyMsg").hidden = items.length > 0;
@@ -226,7 +341,7 @@ function renderHistory() {
     add.onclick = () => {
       const names = checks.filter((c) => c.checked).map((c) => c.value);
       if (!names.length) return;
-      store.addMany(names);
+      store.addMany(names.map((name) => ({ name, order: orderFor(name) })));
       $("history").close();
     };
     if (!checks.length) add.disabled = true;
@@ -253,18 +368,20 @@ function wireUp() {
   $("addForm").onsubmit = (e) => {
     e.preventDefault();
     const name = $("addInput").value.trim();
-    if (name) store.add(name);
+    if (name) store.add(name, orderFor(name));
     $("addInput").value = "";
     $("addInput").focus();
   };
 
   $("finishShop").onclick = () => {
-    const got = items.filter((i) => i.got);
+    const got = items.filter((i) => i.got).sort((a, b) => orderOf(a) - orderOf(b));
     if (!got.length) return;
     const n = got.length;
     if (!confirm(`Finish this shop? The ${n} ticked item${n > 1 ? "s" : ""} will be saved to Past shops and cleared from the list.`)) return;
     const entry = { id: crypto.randomUUID(), at: Date.now(), lookFor: currentLookFor || null, items: got.map((i) => i.name) };
-    store.finishShop(got.map((i) => i.id), [entry, ...pastShops].slice(0, MAX_HISTORY));
+    // Remember where everything bought was, so it goes back there next time.
+    const orders = Object.fromEntries(got.map((i) => [orderKey(i.name), orderOf(i)]));
+    store.finishShop(got.map((i) => i.id), [entry, ...pastShops].slice(0, MAX_HISTORY), orders);
   };
 
   $("historyBtn").onclick = () => { renderHistory(); $("history").showModal(); };
@@ -301,6 +418,7 @@ async function start() {
     (meta) => {
       currentLookFor = meta.lookFor;
       pastShops = Array.isArray(meta.history) ? meta.history : [];
+      shopOrder = meta.shopOrder || {};
       renderDate(meta.lookFor);
       if ($("history").open) renderHistory();
     },

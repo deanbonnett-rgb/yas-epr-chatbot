@@ -58,6 +58,11 @@
     li.got .tick { background: var(--accent); border-color: var(--accent); }
     .name { flex: 1; word-break: break-word; }
     li.got .name { text-decoration: line-through; color: var(--muted); }
+    .handle { color: var(--muted); font-size: 22px; padding: 6px 4px; margin: -6px 0 -6px -6px;
+      cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+    li.dragging { background: var(--accent-soft); box-shadow: 0 4px 14px rgba(0,0,0,.18); position: relative; z-index: 1; }
+    input.edit { flex: 1; min-width: 0; font: inherit; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--accent); background: var(--bg); color: var(--text); }
     .del { background: transparent; color: var(--muted); font-size: 20px; padding: 4px 8px; }
     .section-title { display: flex; justify-content: space-between; align-items: center;
       color: var(--muted); font-size: 14px; margin: 20px 4px 8px; }
@@ -172,6 +177,6 @@
   </div>
 </dialog>
 
-<script type="module" src="app.js?v=3"></script>
+<script type="module" src="app.js?v=4"></script>
 </body>
 </html>

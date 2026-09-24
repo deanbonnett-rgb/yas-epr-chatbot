@@ -6,7 +6,10 @@ shows up on the other phone straight away.
 - **Use-by date at the top.** This is the date you're checking labels against in
   the shop. Tap **1 week from today**, **+5 days** or **+10 days**, or choose any
   date. It's shared, so you both see the same date.
-- **Add items** by typing and tapping **Add**.
+- **Add items** by typing and tapping **Add**. Tap **✎** to change an item's name.
+- **Put the list in shop order** by holding the **⠿** handle and dragging. The app
+  remembers each item's spot, so when it's added again (typed or from Past shops)
+  it goes back to the same place.
 - **Tick items off** while you shop. Ticked items move to a "Got" section at the
   bottom.
 - **Finish shop ✓** saves what you ticked as a past shop (with the date) and clears
