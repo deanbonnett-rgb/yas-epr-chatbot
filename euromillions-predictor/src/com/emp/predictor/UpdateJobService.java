@@ -13,6 +13,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.util.Log;
 
 import java.util.List;
 
@@ -31,19 +32,27 @@ public class UpdateJobService extends JobService {
 
     private volatile boolean stopped;
 
-    /** Schedules (or cancels, if notifications are switched off) the periodic check. */
-    public static void schedule(Context context) {
-        JobScheduler js = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-        if (!notificationsEnabled(context)) {
-            js.cancel(JOB_ID);
-            return;
+    /**
+     * Schedules (or cancels, if notifications are switched off) the periodic check. Returns false
+     * if the system refused; that must never crash the app, which works fine without it.
+     */
+    public static boolean schedule(Context context) {
+        try {
+            JobScheduler js = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            if (!notificationsEnabled(context)) {
+                js.cancel(JOB_ID);
+                return true;
+            }
+            if (Build.VERSION.SDK_INT >= 24 && js.getPendingJob(JOB_ID) != null) return true;
+            return js.schedule(new JobInfo.Builder(JOB_ID, new ComponentName(context, UpdateJobService.class))
+                    .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                    .setPeriodic(PERIOD_MS)
+                    .setPersisted(true)
+                    .build()) == JobScheduler.RESULT_SUCCESS;
+        } catch (RuntimeException e) {
+            Log.e("UpdateJobService", "Could not schedule results check", e);
+            return false;
         }
-        if (Build.VERSION.SDK_INT >= 24 && js.getPendingJob(JOB_ID) != null) return;
-        js.schedule(new JobInfo.Builder(JOB_ID, new ComponentName(context, UpdateJobService.class))
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                .setPeriodic(PERIOD_MS)
-                .setPersisted(true)
-                .build());
     }
 
     static boolean notificationsEnabled(Context context) {

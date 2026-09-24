@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.emp.predictor"
-    android:versionCode="2"
-    android:versionName="1.1">
+    android:versionCode="3"
+    android:versionName="1.2">
 
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 14+ requires this for background jobs that need the internet. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Lets the results check survive a phone restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
