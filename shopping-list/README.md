@@ -12,11 +12,17 @@ shows up on the other phone straight away.
   it goes back to the same place.
 - **Tick items off** while you shop. Ticked items move to a "Got" section at the
   bottom.
+- **Shops.** Add your shops (tap **+ Add a shop**, or use ⚙︎). Tap a shop at the
+  top of the list to see only its items; anything you add is put under that shop.
+  Tap **✎** on an item to change its shop. The app remembers which shop each item
+  is from.
 - **Finish shop ✓** saves what you ticked as a past shop (with the date) and clears
-  it from the list.
+  it from the list. It asks what you spent at each shop. That's optional, and you
+  can add or change it later with **£ Prices** in Past shops.
 - **🕘 Past shops** shows your previous shops. Pick one, untick anything you don't
-  need, and tap **Add to list**. Items already on the list are skipped. The last 20
-  shops are kept.
+  need, and tap **Add to list**. Items already on the list are skipped. The top
+  shows what you've spent this month and last month, per shop. The last 60 shops
+  are kept.
 - **Works with no signal.** Changes you make offline sync when you're back online.
 
 It's a web app you install to your home screen, so it opens full-screen with its own

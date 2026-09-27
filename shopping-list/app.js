@@ -1,8 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js?v=4";
+import { firebaseConfig } from "./firebase-config.js?v=5";
 
 // Bump this (and the ?v= in index.html and sw.js) with each update so phones never
 // mix an old app.js with a new index.html.
-const VERSION = 4;
+const VERSION = 5;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
@@ -29,15 +29,28 @@ function resolveListCode() {
   return code;
 }
 
-// ---------- Dates ----------
+// ---------- Dates and money ----------
 
 const pad = (n) => String(n).padStart(2, "0");
 const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fromISO = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 function today() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
 function daysFromToday(n) { const d = today(); d.setDate(d.getDate() + n); return toISO(d); }
+const shortDate = (d) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
+const GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
+const money = (n) => GBP.format(n);
+// Accepts "45.2", "£45.20" or "45,20". Returns null when blank or not a price.
+function parseMoney(s) {
+  const t = (s || "").replace(/[£\s]/g, "").replace(",", ".");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+}
 
 // ---------- Storage back ends ----------
+// Both back ends keep the same shape: list-level fields (date, shops, past shops,
+// remembered positions) on one record, and the items separately.
 
 // Shared, real-time: Firebase Firestore.
 async function firebaseStore(code) {
@@ -50,6 +63,7 @@ async function firebaseStore(code) {
   const listRef = fs.doc(db, "lists", code);
   const itemsRef = fs.collection(listRef, "items");
 
+  // Batched writes (not transactions) so everything still works with no signal in the shop.
   return {
     subscribe(onMeta, onItems, onStatus) {
       fs.onSnapshot(listRef, { includeMetadataChanges: true }, (snap) => {
@@ -60,29 +74,27 @@ async function firebaseStore(code) {
         onItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       }, (err) => onStatus("Sync error: " + err.message));
     },
-    setDate: (iso) => fs.setDoc(listRef, { lookFor: iso }, { merge: true }),
-    add: (name, order) => fs.addDoc(itemsRef, { name, got: false, createdAt: Date.now(), order }),
+    // Maps inside `patch` (like shopOrder) are merged key by key; everything else is replaced.
+    setMeta: (patch) => fs.setDoc(listRef, patch, { merge: true }),
+    async addMany(entries, metaPatch) {
+      const batch = fs.writeBatch(db);
+      const now = Date.now();
+      entries.forEach((e, i) => batch.set(fs.doc(itemsRef), { got: false, createdAt: now + i, ...e }));
+      if (metaPatch) batch.set(listRef, metaPatch, { merge: true });
+      await batch.commit();
+    },
     setGot: (id, got) => fs.updateDoc(fs.doc(itemsRef, id), { got }),
-    // Changes an item and remembers its place in the shop under its name.
-    async update(id, data, name, order) {
+    async update(id, data, metaPatch) {
       const batch = fs.writeBatch(db);
       batch.update(fs.doc(itemsRef, id), data);
-      batch.set(listRef, { shopOrder: { [orderKey(name)]: order } }, { merge: true });
+      batch.set(listRef, metaPatch, { merge: true });
       await batch.commit();
     },
     remove: (id) => fs.deleteDoc(fs.doc(itemsRef, id)),
-    // Batched writes (not transactions) so these still work with no signal in the shop.
-    async finishShop(ids, pastShops, orders) {
+    async finishShop(ids, metaPatch) {
       const batch = fs.writeBatch(db);
-      batch.set(listRef, { history: pastShops, shopOrder: orders }, { merge: true });
+      batch.set(listRef, metaPatch, { merge: true });
       ids.forEach((id) => batch.delete(fs.doc(itemsRef, id)));
-      await batch.commit();
-    },
-    setHistory: (pastShops) => fs.setDoc(listRef, { history: pastShops }, { merge: true }),
-    async addMany(entries) {
-      const batch = fs.writeBatch(db);
-      const now = Date.now();
-      entries.forEach(({ name, order }, i) => batch.set(fs.doc(itemsRef), { name, got: false, createdAt: now + i, order }));
       await batch.commit();
     },
   };
@@ -93,54 +105,71 @@ function localStore(code) {
   const key = "list:" + code;
   let state = (() => { try { return JSON.parse(storageGet(key)) || {}; } catch { return {}; } })();
   state.items ||= [];
+  state.meta ||= { lookFor: state.lookFor, history: state.history, shopOrder: state.shopOrder }; // older saves
   let listeners = null;
   const save = () => {
     storageSet(key, JSON.stringify(state));
-    listeners?.onMeta({ lookFor: state.lookFor, history: state.history, shopOrder: state.shopOrder });
-    listeners?.onItems(state.items.slice());
+    listeners?.onMeta({ ...state.meta });
+    listeners?.onItems(state.items.map((i) => ({ ...i })));
+  };
+  const isMap = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const merge = (patch) => {
+    for (const [k, v] of Object.entries(patch || {})) {
+      state.meta[k] = isMap(v) && isMap(state.meta[k]) ? { ...state.meta[k], ...v } : v;
+    }
   };
   return {
     subscribe(onMeta, onItems, onStatus) { listeners = { onMeta, onItems }; onStatus("Saved on this phone only"); save(); },
-    setDate(iso) { state.lookFor = iso; save(); },
-    add(name, order) { state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: Date.now(), order }); save(); },
-    update(id, data, name, order) {
-      Object.assign(state.items.find((i) => i.id === id) || {}, data);
-      state.shopOrder = { ...state.shopOrder, [orderKey(name)]: order };
+    setMeta(patch) { merge(patch); save(); },
+    addMany(entries, metaPatch) {
+      const now = Date.now();
+      entries.forEach((e, i) => state.items.push({ id: crypto.randomUUID(), got: false, createdAt: now + i, ...e }));
+      merge(metaPatch);
       save();
     },
     setGot(id, got) { const it = state.items.find((i) => i.id === id); if (it) it.got = got; save(); },
-    remove(id) { state.items = state.items.filter((i) => i.id !== id); save(); },
-    finishShop(ids, pastShops, orders) {
-      state.items = state.items.filter((i) => !ids.includes(i.id));
-      state.history = pastShops;
-      state.shopOrder = { ...state.shopOrder, ...orders };
+    update(id, data, metaPatch) {
+      Object.assign(state.items.find((i) => i.id === id) || {}, data);
+      merge(metaPatch);
       save();
     },
-    setHistory(pastShops) { state.history = pastShops; save(); },
-    addMany(entries) {
-      const now = Date.now();
-      entries.forEach(({ name, order }, i) => state.items.push({ id: crypto.randomUUID(), name, got: false, createdAt: now + i, order }));
+    remove(id) { state.items = state.items.filter((i) => i.id !== id); save(); },
+    finishShop(ids, metaPatch) {
+      state.items = state.items.filter((i) => !ids.includes(i.id));
+      merge(metaPatch);
       save();
     },
   };
 }
 
-// ---------- UI ----------
+// ---------- State ----------
 
 const code = resolveListCode();
 const shareUrl = `${location.origin}${location.pathname}#list=${code}`;
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 60; // about a year of weekly shops, for spending totals
 let store;
 let items = [];
-let pastShops = []; // past shops, newest first: { id, at, lookFor, items: [names] }
-let shopOrder = {}; // remembered position for each item name, so re-added items go back to their spot
-let busy = false; // true while dragging or editing, so a sync from the other phone doesn't wipe it
+let currentLookFor = null;
+let pastShops = []; // newest first: { id, at, lookFor, items: [names], shops: [names], spend: [{ shop, amount }] }
+let shops = []; // shop names, e.g. ["Aldi", "Food Warehouse"]
+let shopOrder = {}; // item name -> remembered position, so re-added items go back to their spot
+let itemShop = {}; // item name -> the shop it was last bought at
+let filter = storageGet("shopFilter") || ""; // shop this phone is showing ("" = all). Not shared.
+const shown = () => (shops.includes(filter) ? filter : ""); // ignores a filter for a shop that's gone
+let busy = false; // true while dragging, so a sync from the other phone doesn't interrupt it
 
 // Items are sorted by `order`. It's a plain number: new items get the current time
 // (so they go to the bottom), and dragging sets it halfway between the new neighbours.
-function orderKey(name) { return name.trim().toLowerCase(); }
+const key = (name) => name.trim().toLowerCase();
 const orderOf = (i) => i.order ?? i.createdAt;
-const orderFor = (name) => shopOrder[orderKey(name)] ?? Date.now();
+const byOrder = (a, b) => orderOf(a) - orderOf(b);
+const orderFor = (name) => shopOrder[key(name)] ?? Date.now();
+// An item's shop, ignoring shops that have since been removed.
+const shopOf = (i) => (i.shop && shops.includes(i.shop) ? i.shop : null);
+const rememberedShop = (name) => (shops.includes(itemShop[key(name)]) ? itemShop[key(name)] : null);
+const shopLabel = (s) => s || (shops.length ? "No shop" : "Shop");
+
+// ---------- Use-by date ----------
 
 function renderDate(iso) {
   if (!iso) {
@@ -149,7 +178,7 @@ function renderDate(iso) {
     return;
   }
   const d = fromISO(iso);
-  $("dateValue").textContent = d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  $("dateValue").textContent = shortDate(d);
   const diff = Math.round((d - today()) / 86400000);
   $("dateSub").textContent =
     diff === 0 ? "That's today" :
@@ -158,6 +187,38 @@ function renderDate(iso) {
     `That was ${-diff} day${diff === -1 ? "" : "s"} ago – set a new date for this shop`;
   $("datePicker").value = iso;
 }
+
+// ---------- Shops bar ----------
+
+function renderShopBar() {
+  const bar = $("shopBar");
+  bar.replaceChildren();
+  const chip = (label, value) => {
+    const b = document.createElement("button");
+    b.className = "shop-chip" + (shown() === value ? " active" : "");
+    b.textContent = label;
+    b.onclick = () => { filter = value; storageSet("shopFilter", value); renderShopBar(); renderItems(); };
+    return b;
+  };
+  if (shops.length) {
+    bar.append(chip("All", ""));
+    shops.forEach((s) => bar.append(chip(s, s)));
+  }
+  const add = document.createElement("button");
+  add.className = "shop-chip add";
+  add.textContent = shops.length ? "+ Shop" : "+ Add a shop (e.g. Aldi)";
+  add.onclick = addShopPrompt;
+  bar.append(add);
+}
+
+function addShopPrompt() {
+  const name = (prompt("Shop name, e.g. Aldi or Food Warehouse:") || "").trim();
+  if (!name) return;
+  if (shops.some((s) => key(s) === key(name))) return alert(`${name} is already there.`);
+  store.setMeta({ shops: [...shops, name] });
+}
+
+// ---------- Items ----------
 
 function itemRow(item) {
   const li = document.createElement("li");
@@ -177,6 +238,13 @@ function itemRow(item) {
   name.className = "name";
   name.textContent = item.name;
   name.onclick = tick.onclick;
+  // In the "All" view, show which shop each item is for.
+  if (!shown() && shopOf(item)) {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = shopOf(item);
+    name.append(tag);
+  }
   const del = document.createElement("button");
   del.className = "del";
   del.textContent = "✕";
@@ -186,38 +254,64 @@ function itemRow(item) {
   edit.className = "del";
   edit.textContent = "✎";
   edit.setAttribute("aria-label", "Edit " + item.name);
-  edit.onclick = () => startEdit(li, item, name);
+  edit.onclick = () => openEdit(item);
   if (item.got) li.append(tick, name, del);
   else li.append(handle, tick, name, edit, del);
   return li;
 }
 
-function startEdit(li, item, nameEl) {
-  busy = true;
-  const input = document.createElement("input");
-  input.className = "edit";
-  input.value = item.name;
-  input.setAttribute("aria-label", "Item name");
-  nameEl.replaceWith(input);
-  input.focus();
-  input.select();
-  let done = false;
-  const finish = (save) => {
-    if (done) return;
-    done = true;
-    busy = false;
-    const newName = input.value.trim();
-    if (save && newName && newName !== item.name) {
-      item.name = newName; // show it straight away; the sync confirms it
-      store.update(item.id, { name: newName }, newName, orderOf(item));
-    }
-    renderItems();
-  };
-  input.onkeydown = (e) => {
-    if (e.key === "Enter") finish(true);
-    if (e.key === "Escape") finish(false);
-  };
-  input.onblur = () => finish(true);
+function renderItems() {
+  if (busy) return;
+  const f = shown();
+  const visible = items.filter((i) => !f || shopOf(i) === f).sort(byOrder);
+  const todo = visible.filter((i) => !i.got);
+  const got = visible.filter((i) => i.got);
+  $("todoList").replaceChildren(...todo.map(itemRow));
+  $("gotList").replaceChildren(...got.map(itemRow));
+  $("emptyMsg").hidden = visible.length > 0;
+  $("emptyMsg").textContent = f ? `Nothing on the list for ${f}.` : "Nothing on the list yet.";
+  $("addInput").placeholder = f ? `Add an item for ${f}` : "Add an item, e.g. Milk";
+  // Finish shop covers everything ticked, whichever shop is showing.
+  const allGot = items.filter((i) => i.got).length;
+  $("gotHeader").hidden = allGot === 0;
+  $("gotCount").textContent = got.length === allGot ? `Got (${allGot})` : `Got (${got.length} here, ${allGot} in total)`;
+}
+
+function addItem(name) {
+  const shop = shown() || rememberedShop(name);
+  store.addMany([{ name, order: orderFor(name), shop }]);
+}
+
+// Edit an item's name and shop.
+let editing = null;
+function openEdit(item) {
+  editing = { id: item.id, shop: shopOf(item) };
+  $("editName").value = item.name;
+  renderEditShops();
+  $("editShopRow").hidden = shops.length === 0;
+  $("editDialog").showModal();
+}
+function renderEditShops() {
+  const box = $("editShops");
+  box.replaceChildren();
+  for (const s of [null, ...shops]) {
+    const b = document.createElement("button");
+    b.className = "shop-chip" + (editing.shop === s ? " active" : "");
+    b.textContent = s || "No shop";
+    b.onclick = () => { editing.shop = s; renderEditShops(); };
+    box.append(b);
+  }
+}
+function saveEdit() {
+  const item = items.find((i) => i.id === editing?.id);
+  const name = $("editName").value.trim();
+  $("editDialog").close();
+  if (!item || !name) return;
+  // Remember this item's place and shop under its (possibly new) name.
+  store.update(item.id, { name, shop: editing.shop }, {
+    shopOrder: { [key(name)]: orderOf(item) },
+    itemShop: { [key(name)]: editing.shop },
+  });
 }
 
 // Drag by the ⠿ handle. Uses pointer events so it works with a finger, not just a mouse.
@@ -259,7 +353,7 @@ function startDrag(e, li) {
     else if (next) order = orderOf(next) - 1000;
     if (item && order !== undefined && order !== orderOf(item)) {
       item.order = order; // show it straight away; the sync confirms it
-      store.update(item.id, { order }, item.name, order);
+      store.update(item.id, { order }, { shopOrder: { [key(item.name)]: order } });
     }
     renderItems();
   };
@@ -268,44 +362,155 @@ function startDrag(e, li) {
   document.addEventListener("pointercancel", onUp);
 }
 
-function renderItems() {
-  if (busy) return;
-  const sorted = items.slice().sort((a, b) => orderOf(a) - orderOf(b));
-  const todo = sorted.filter((i) => !i.got);
-  const got = sorted.filter((i) => i.got);
-  $("todoList").replaceChildren(...todo.map(itemRow));
-  $("gotList").replaceChildren(...got.map(itemRow));
-  $("emptyMsg").hidden = items.length > 0;
-  $("gotHeader").hidden = got.length === 0;
-  $("gotCount").textContent = `Got (${got.length})`;
+// ---------- Prices (finishing a shop, or editing a past one) ----------
+
+// groups: [{ shop, count }]. Calls onSave([{ shop, amount }]) with the prices filled in.
+let priceSave = null;
+function openPrices({ title, intro, button, groups, spend = [] }, onSave) {
+  $("priceTitle").textContent = title;
+  $("priceIntro").textContent = intro;
+  $("priceSave").textContent = button;
+  const box = $("priceFields");
+  box.replaceChildren();
+  const inputs = groups.map(({ shop, count }) => {
+    const row = document.createElement("label");
+    row.className = "price-row";
+    const text = document.createElement("span");
+    text.className = "price-shop";
+    text.textContent = groups.length === 1 && !shop ? "Total spent" : shopLabel(shop);
+    if (count) {
+      const small = document.createElement("small");
+      small.textContent = `${count} item${count === 1 ? "" : "s"}`;
+      text.append(small);
+    }
+    const wrap = document.createElement("span");
+    wrap.className = "money-input";
+    const input = document.createElement("input");
+    input.inputMode = "decimal";
+    input.placeholder = "0.00";
+    input.setAttribute("aria-label", `Amount spent at ${shopLabel(shop)}`);
+    const was = spend.find((s) => s.shop === shop);
+    if (was) input.value = was.amount.toFixed(2);
+    wrap.append("£", input);
+    row.append(text, wrap);
+    box.append(row);
+    return { shop, input };
+  });
+  priceSave = () => {
+    const bad = inputs.find(({ input }) => input.value.trim() && parseMoney(input.value) === null);
+    if (bad) { bad.input.focus(); return alert("That price doesn't look right – use numbers like 45.20"); }
+    $("priceDialog").close();
+    onSave(inputs.map(({ shop, input }) => ({ shop, amount: parseMoney(input.value) })).filter((s) => s.amount !== null));
+  };
+  $("priceDialog").showModal();
 }
 
-// ---------- Past shops ----------
+function groupsFor(list) {
+  const counts = new Map();
+  list.forEach((i) => counts.set(shopOf(i), (counts.get(shopOf(i)) || 0) + 1));
+  // Named shops first, in the order they were added; "No shop" last.
+  return [...counts].map(([shop, count]) => ({ shop, count }))
+    .sort((a, b) => (a.shop === null) - (b.shop === null) || shops.indexOf(a.shop) - shops.indexOf(b.shop));
+}
 
-let currentLookFor = null;
-const norm = (s) => s.trim().toLowerCase();
+function finishShop() {
+  const got = items.filter((i) => i.got).sort(byOrder);
+  if (!got.length) return;
+  const n = got.length;
+  openPrices({
+    title: "Finish shop",
+    intro: `The ${n} ticked item${n > 1 ? "s" : ""} will be saved to Past shops and cleared from the list. Add what you spent if you want to track it (optional).`,
+    button: "Finish shop",
+    groups: groupsFor(got),
+  }, (spend) => {
+    const entry = {
+      id: crypto.randomUUID(), at: Date.now(), lookFor: currentLookFor || null,
+      items: got.map((i) => i.name),
+      shops: [...new Set(got.map(shopOf))],
+      spend,
+    };
+    // Remember where everything bought was, and which shop, so it goes back there next time.
+    store.finishShop(got.map((i) => i.id), {
+      history: [entry, ...pastShops].slice(0, MAX_HISTORY),
+      shopOrder: Object.fromEntries(got.map((i) => [key(i.name), orderOf(i)])),
+      itemShop: Object.fromEntries(got.map((i) => [key(i.name), shopOf(i)])),
+    });
+  });
+}
+
+// ---------- Past shops and spending ----------
+
+const totalOf = (shop) => (shop.spend || []).reduce((t, s) => t + s.amount, 0);
+
+function spendLine(spend) {
+  if (!spend?.length) return "";
+  if (spend.length === 1) return money(spend[0].amount);
+  return spend.map((s) => `${shopLabel(s.shop)} ${money(s.amount)}`).join(" · ") + ` = ${money(spend.reduce((t, s) => t + s.amount, 0))}`;
+}
+
+function renderSpendSummary() {
+  const box = $("spendSummary");
+  const now = new Date();
+  const month = (offset) => {
+    const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
+    const inMonth = pastShops.filter((p) => p.at >= start && p.at < end && p.spend?.length);
+    const byShop = new Map();
+    inMonth.forEach((p) => p.spend.forEach((s) => byShop.set(s.shop, (byShop.get(s.shop) || 0) + s.amount)));
+    return { name: start.toLocaleDateString(undefined, { month: "long" }), total: inMonth.reduce((t, p) => t + totalOf(p), 0), byShop, trips: inMonth.length };
+  };
+  const [thisM, lastM] = [month(0), month(-1)];
+  if (!thisM.trips && !lastM.trips) { box.hidden = true; return; }
+  box.hidden = false;
+  box.replaceChildren();
+  for (const m of [thisM, lastM]) {
+    if (!m.trips) continue;
+    const div = document.createElement("div");
+    div.className = "spend-month";
+    const head = document.createElement("div");
+    head.innerHTML = `<span></span><b></b>`;
+    head.firstChild.textContent = `${m.name} (${m.trips} shop${m.trips === 1 ? "" : "s"})`;
+    head.lastChild.textContent = money(m.total);
+    div.append(head);
+    if (m.byShop.size > 1 || (m.byShop.size === 1 && !m.byShop.has(null))) {
+      const small = document.createElement("small");
+      small.textContent = [...m.byShop].map(([s, a]) => `${shopLabel(s)} ${money(a)}`).join(" · ");
+      div.append(small);
+    }
+    box.append(div);
+  }
+}
 
 function renderHistory() {
+  renderSpendSummary();
   const box = $("historyList");
   box.replaceChildren();
   $("historyEmpty").hidden = pastShops.length > 0;
-  const onList = new Set(items.filter((i) => !i.got).map((i) => norm(i.name)));
+  const onList = new Set(items.filter((i) => !i.got).map((i) => key(i.name)));
 
   for (const shop of pastShops) {
     const card = document.createElement("details");
     card.className = "shop";
     const summary = document.createElement("summary");
-    const when = new Date(shop.at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    const when = shortDate(new Date(shop.at));
     summary.innerHTML = `<span class="shop-date"></span><span class="shop-count"></span>`;
     summary.firstChild.textContent = when;
-    summary.lastChild.textContent = `${shop.items.length} item${shop.items.length === 1 ? "" : "s"}`;
+    const total = totalOf(shop);
+    summary.lastChild.textContent = (total ? money(total) + " · " : "") + `${shop.items.length} item${shop.items.length === 1 ? "" : "s"}`;
     card.append(summary);
+
+    if (shop.spend?.length > 1 || shop.spend?.[0]?.shop) {
+      const line = document.createElement("div");
+      line.className = "shop-spend";
+      line.textContent = spendLine(shop.spend);
+      card.append(line);
+    }
 
     const checks = [];
     const ul = document.createElement("div");
     ul.className = "shop-items";
     for (const name of shop.items) {
-      const already = onList.has(norm(name));
+      const already = onList.has(key(name));
       const label = document.createElement("label");
       label.className = already ? "already" : "";
       const cb = document.createElement("input");
@@ -331,30 +536,66 @@ function renderHistory() {
       checks.forEach((c) => (c.checked = !any));
       toggle.textContent = any ? "Select all" : "Select none";
     };
+    const prices = document.createElement("button");
+    prices.className = "link-btn";
+    prices.textContent = "£ Prices";
+    prices.onclick = () => {
+      const known = (shop.shops?.length ? shop.shops : [null]).filter((s) => s === null || shops.includes(s));
+      const groups = [...new Set([...known, ...(shop.spend || []).map((s) => s.shop)])].map((s) => ({ shop: s }));
+      openPrices({
+        title: `Prices for ${when}`, intro: "Add or change what you spent on this shop.", button: "Save",
+        groups: groups.length ? groups : [{ shop: null }], spend: shop.spend || [],
+      }, (spend) => store.setMeta({ history: pastShops.map((h) => (h.id === shop.id ? { ...h, spend } : h)) }));
+    };
     const del = document.createElement("button");
     del.className = "link-btn danger";
     del.textContent = "Delete";
-    del.onclick = () => confirm(`Delete the shop from ${when}?`) && store.setHistory(pastShops.filter((h) => h.id !== shop.id));
+    del.onclick = () => confirm(`Delete the shop from ${when}?`) && store.setMeta({ history: pastShops.filter((h) => h.id !== shop.id) });
     const add = document.createElement("button");
     add.className = "btn";
     add.textContent = "Add to list";
     add.onclick = () => {
       const names = checks.filter((c) => c.checked).map((c) => c.value);
       if (!names.length) return;
-      store.addMany(names.map((name) => ({ name, order: orderFor(name) })));
+      store.addMany(names.map((name) => ({ name, order: orderFor(name), shop: rememberedShop(name) })));
       $("history").close();
     };
     if (!checks.length) add.disabled = true;
-    actions.append(toggle, del, add);
+    actions.append(toggle, prices, del, add);
     card.append(actions);
     box.append(card);
   }
   box.querySelector("details")?.setAttribute("open", "");
 }
 
+// ---------- Settings: shops ----------
+
+function renderShopSettings() {
+  const box = $("shopSettings");
+  box.replaceChildren();
+  $("noShops").hidden = shops.length > 0;
+  for (const s of shops) {
+    const row = document.createElement("div");
+    row.className = "shop-setting";
+    const name = document.createElement("span");
+    name.textContent = s;
+    const del = document.createElement("button");
+    del.className = "link-btn danger";
+    del.textContent = "Remove";
+    del.onclick = () => {
+      if (!confirm(`Remove ${s}? Items for ${s} will stay on the list without a shop.`)) return;
+      store.setMeta({ shops: shops.filter((x) => x !== s) });
+    };
+    row.append(name, del);
+    box.append(row);
+  }
+}
+
+// ---------- Wiring ----------
+
 function wireUp() {
   document.querySelectorAll(".chip[data-days]").forEach((b) => {
-    b.onclick = () => store.setDate(daysFromToday(Number(b.dataset.days)));
+    b.onclick = () => store.setMeta({ lookFor: daysFromToday(Number(b.dataset.days)) });
   });
   const openPicker = () => {
     const p = $("datePicker");
@@ -363,32 +604,31 @@ function wireUp() {
   };
   $("pickBtn").onclick = openPicker;
   $("dateValue").onclick = openPicker;
-  $("datePicker").onchange = (e) => e.target.value && store.setDate(e.target.value);
+  $("datePicker").onchange = (e) => e.target.value && store.setMeta({ lookFor: e.target.value });
 
   $("addForm").onsubmit = (e) => {
     e.preventDefault();
     const name = $("addInput").value.trim();
-    if (name) store.add(name, orderFor(name));
+    if (name) addItem(name);
     $("addInput").value = "";
     $("addInput").focus();
   };
 
-  $("finishShop").onclick = () => {
-    const got = items.filter((i) => i.got).sort((a, b) => orderOf(a) - orderOf(b));
-    if (!got.length) return;
-    const n = got.length;
-    if (!confirm(`Finish this shop? The ${n} ticked item${n > 1 ? "s" : ""} will be saved to Past shops and cleared from the list.`)) return;
-    const entry = { id: crypto.randomUUID(), at: Date.now(), lookFor: currentLookFor || null, items: got.map((i) => i.name) };
-    // Remember where everything bought was, so it goes back there next time.
-    const orders = Object.fromEntries(got.map((i) => [orderKey(i.name), orderOf(i)]));
-    store.finishShop(got.map((i) => i.id), [entry, ...pastShops].slice(0, MAX_HISTORY), orders);
-  };
+  $("finishShop").onclick = finishShop;
+  $("priceSave").onclick = () => priceSave?.();
+  $("priceCancel").onclick = () => $("priceDialog").close();
+  $("priceFields").onkeydown = (e) => e.key === "Enter" && priceSave?.();
+
+  $("editSave").onclick = saveEdit;
+  $("editCancel").onclick = () => $("editDialog").close();
+  $("editName").onkeydown = (e) => e.key === "Enter" && saveEdit();
 
   $("historyBtn").onclick = () => { renderHistory(); $("history").showModal(); };
   $("closeHistory").onclick = () => $("history").close();
 
-  $("settingsBtn").onclick = () => { $("listCode").textContent = code; $("settings").showModal(); };
+  $("settingsBtn").onclick = () => { $("listCode").textContent = code; renderShopSettings(); $("settings").showModal(); };
   $("closeSettings").onclick = () => $("settings").close();
+  $("addShopBtn").onclick = addShopPrompt;
   $("shareBtn").onclick = async () => {
     try { await navigator.share({ title: "Our Shopping List", text: "Join our shopping list", url: shareUrl }); }
     catch { $("copyBtn").click(); }
@@ -418,9 +658,14 @@ async function start() {
     (meta) => {
       currentLookFor = meta.lookFor;
       pastShops = Array.isArray(meta.history) ? meta.history : [];
+      shops = Array.isArray(meta.shops) ? meta.shops : [];
       shopOrder = meta.shopOrder || {};
+      itemShop = meta.itemShop || {};
       renderDate(meta.lookFor);
+      renderShopBar();
+      renderItems();
       if ($("history").open) renderHistory();
+      if ($("settings").open) renderShopSettings();
     },
     (list) => { items = list; renderItems(); },
     (msg) => { $("status").textContent = `${msg} · v${VERSION}`; },
