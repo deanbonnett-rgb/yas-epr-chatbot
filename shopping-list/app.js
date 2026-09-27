@@ -1,8 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js?v=5";
+import { firebaseConfig } from "./firebase-config.js?v=6";
 
 // Bump this (and the ?v= in index.html and sw.js) with each update so phones never
 // mix an old app.js with a new index.html.
-const VERSION = 5;
+const VERSION = 6;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
@@ -154,6 +154,7 @@ let pastShops = []; // newest first: { id, at, lookFor, items: [names], shops: [
 let shops = []; // shop names, e.g. ["Aldi", "Food Warehouse"]
 let shopOrder = {}; // item name -> remembered position, so re-added items go back to their spot
 let itemShop = {}; // item name -> the shop it was last bought at
+let barcodes = {}; // barcode -> the name you gave it, so a second scan needs no lookup
 let filter = storageGet("shopFilter") || ""; // shop this phone is showing ("" = all). Not shared.
 const shown = () => (shops.includes(filter) ? filter : ""); // ignores a filter for a shop that's gone
 let busy = false; // true while dragging, so a sync from the other phone doesn't interrupt it
@@ -277,9 +278,126 @@ function renderItems() {
   $("gotCount").textContent = got.length === allGot ? `Got (${allGot})` : `Got (${got.length} here, ${allGot} in total)`;
 }
 
-function addItem(name) {
+function addItem(name, extra = {}, metaPatch) {
   const shop = shown() || rememberedShop(name);
-  store.addMany([{ name, order: orderFor(name), shop }]);
+  store.addMany([{ name, order: orderFor(name), shop, ...extra }], metaPatch);
+}
+
+// ---------- Barcode scanning ----------
+// Chrome on Android can read barcodes from the camera (BarcodeDetector). The product
+// name comes from Open Food Facts, a free, open product database. Names you type or
+// change are remembered per barcode for both phones.
+
+let scan = null; // { stream, timer } while the camera is running
+let scannedCode = null;
+
+function scanReset(message) {
+  scannedCode = null;
+  $("scanMsg").textContent = message || "Point the camera at the barcode.";
+  $("scanResult").hidden = true;
+  $("scanAdd").hidden = true;
+}
+
+async function startCamera() {
+  if (!("BarcodeDetector" in window)) {
+    $("scanView").hidden = true;
+    $("scanMsg").textContent = "This browser can't scan barcodes with the camera. Tap below to type the number printed under the barcode.";
+    return;
+  }
+  try {
+    const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    if (!$("scanDialog").open) { stream.getTracks().forEach((t) => t.stop()); return; }
+    const video = $("scanVideo");
+    video.srcObject = stream;
+    $("scanView").hidden = false;
+    await video.play();
+    scan = { stream, timer: null };
+    const look = async () => {
+      if (!scan) return;
+      try {
+        const found = await detector.detect(video);
+        if (found.length && scan) {
+          stopCamera();
+          navigator.vibrate?.(80);
+          return lookupBarcode(found[0].rawValue);
+        }
+      } catch {} // a frame that couldn't be read; try the next one
+      if (scan) scan.timer = setTimeout(look, 200);
+    };
+    look();
+  } catch (err) {
+    $("scanView").hidden = true;
+    $("scanMsg").textContent = err.name === "NotAllowedError"
+      ? "The camera is blocked for this app. Allow it in Chrome (tap the icon left of the address, then Permissions), or type the number instead."
+      : "Couldn't start the camera. You can type the number under the barcode instead.";
+  }
+}
+
+function stopCamera() {
+  if (!scan) return;
+  clearTimeout(scan.timer);
+  scan.stream.getTracks().forEach((t) => t.stop());
+  scan = null;
+  $("scanVideo").srcObject = null;
+  $("scanView").hidden = true;
+}
+
+function openScanner() {
+  scanReset();
+  $("scanDialog").showModal();
+  startCamera();
+}
+
+// Builds a readable name like "Cowbelle Semi Skimmed Milk 2 l" from Open Food Facts.
+async function productName(code) {
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}?fields=product_name,product_name_en,brands,quantity`, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const p = j.status === 1 && j.product;
+    const base = (p?.product_name_en || p?.product_name || "").trim();
+    if (!base) return null;
+    const brand = (p.brands || "").split(",")[0].trim();
+    let name = brand && !base.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${base}` : base;
+    const qty = (p.quantity || "").trim();
+    if (qty && !name.toLowerCase().includes(qty.toLowerCase())) name += ` ${qty}`;
+    return name;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function lookupBarcode(raw) {
+  const code = String(raw).replace(/\D/g, "");
+  if (code.length < 6 || code.length > 14) {
+    scanReset("That doesn't look like a barcode number. Try again.");
+    return startCamera();
+  }
+  scannedCode = code;
+  $("scanMsg").textContent = `Looking up ${code}…`;
+  const name = barcodes[code] || (await productName(code));
+  if (scannedCode !== code) return; // closed or rescanned meanwhile
+  $("scanMsg").textContent = name
+    ? "Found it. Change the name if you like, then add it."
+    : "Not found in the product database. Type what it is and the app will remember it next time.";
+  $("scanName").value = name || "";
+  $("scanCode").textContent = `Barcode ${code}`;
+  $("scanResult").hidden = false;
+  $("scanAdd").hidden = false;
+  $("scanName").focus();
+}
+
+function addScanned() {
+  const name = $("scanName").value.trim();
+  if (!name || !scannedCode) return $("scanName").focus();
+  addItem(name, { barcode: scannedCode }, { barcodes: { [scannedCode]: name } });
+  scanReset(`Added ${name} ✓ Scan the next one, or tap Done.`);
+  startCamera();
 }
 
 // Edit an item's name and shop.
@@ -606,6 +724,16 @@ function wireUp() {
   $("dateValue").onclick = openPicker;
   $("datePicker").onchange = (e) => e.target.value && store.setMeta({ lookFor: e.target.value });
 
+  $("scanBtn").onclick = openScanner;
+  $("scanAdd").onclick = addScanned;
+  $("scanName").onkeydown = (e) => e.key === "Enter" && addScanned();
+  $("scanDone").onclick = () => $("scanDialog").close();
+  $("scanDialog").onclose = () => { stopCamera(); scannedCode = null; };
+  $("scanManual").onclick = () => {
+    const typed = prompt("Type the numbers under the barcode:");
+    if (typed) { stopCamera(); lookupBarcode(typed); }
+  };
+
   $("addForm").onsubmit = (e) => {
     e.preventDefault();
     const name = $("addInput").value.trim();
@@ -661,6 +789,7 @@ async function start() {
       shops = Array.isArray(meta.shops) ? meta.shops : [];
       shopOrder = meta.shopOrder || {};
       itemShop = meta.itemShop || {};
+      barcodes = meta.barcodes || {};
       renderDate(meta.lookFor);
       renderShopBar();
       renderItems();

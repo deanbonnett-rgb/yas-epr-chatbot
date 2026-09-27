@@ -7,6 +7,11 @@ shows up on the other phone straight away.
   the shop. Tap **1 week from today**, **+5 days** or **+10 days**, or choose any
   date. It's shared, so you both see the same date.
 - **Add items** by typing and tapping **Add**. Tap **✎** to change an item's name.
+- **Scan a barcode** with **📷** to add a product by name. Names come from
+  [Open Food Facts](https://world.openfoodfacts.org), a free product database. If a
+  product isn't there, type its name once and the app remembers that barcode. The
+  scanner keeps going after each item so you can scan several in a row. Scanning
+  needs Chrome on Android; elsewhere you can type the barcode number.
 - **Put the list in shop order** by holding the **⠿** handle and dragging. The app
   remembers each item's spot, so when it's added again (typed or from Past shops)
   it goes back to the same place.

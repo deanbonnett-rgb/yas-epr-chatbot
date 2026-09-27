@@ -47,6 +47,14 @@
       border: 1px solid var(--line); background: var(--card); color: var(--text); }
     form.add button { background: var(--accent); color: #fff; padding: 0 18px; font-weight: 600; }
     @media (prefers-color-scheme: dark) { form.add button { color: #0d1a12; } }
+    form.add button.scan-btn { background: var(--card); border: 1px solid var(--line); padding: 0 12px; font-size: 20px; }
+
+    /* Barcode scanner */
+    .scan-view { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; margin-bottom: 10px; }
+    .scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .scan-frame { position: absolute; inset: 30% 10%; border: 3px solid rgba(255,255,255,.85); border-radius: 10px;
+      box-shadow: 0 0 0 999px rgba(0,0,0,.25); }
+    #scanCode { display: block; color: var(--muted); margin: -2px 0 12px; }
 
     /* Items */
     ul { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: 14px;
@@ -163,6 +171,7 @@
 
   <form class="add" id="addForm" autocomplete="off">
     <input id="addInput" placeholder="Add an item, e.g. Milk" enterkeyhint="done" aria-label="New item">
+    <button type="button" class="scan-btn" id="scanBtn" aria-label="Scan a barcode">📷</button>
     <button type="submit">Add</button>
   </form>
 
@@ -212,6 +221,24 @@
   </div>
 </dialog>
 
+<dialog id="scanDialog">
+  <h2>Scan a barcode</h2>
+  <div class="scan-view" id="scanView" hidden>
+    <video id="scanVideo" playsinline muted></video>
+    <div class="scan-frame"></div>
+  </div>
+  <p id="scanMsg">Point the camera at the barcode.</p>
+  <div id="scanResult" hidden>
+    <input id="scanName" aria-label="Item name" enterkeyhint="done">
+    <small id="scanCode"></small>
+  </div>
+  <div class="row">
+    <button class="btn secondary" id="scanDone">Done</button>
+    <button class="btn" id="scanAdd" hidden>Add to list</button>
+  </div>
+  <button class="link-btn" id="scanManual" style="margin-top:10px">Type the barcode number instead</button>
+</dialog>
+
 <dialog id="settings">
   <h2>Share this list</h2>
   <p>Send this link to your partner. When they open it, you'll both see the same list.</p>
@@ -235,6 +262,6 @@
   </div>
 </dialog>
 
-<script type="module" src="app.js?v=5"></script>
+<script type="module" src="app.js?v=6"></script>
 </body>
 </html>
