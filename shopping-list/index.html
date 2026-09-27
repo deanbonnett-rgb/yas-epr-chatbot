@@ -47,6 +47,9 @@
       border: 1px solid var(--line); background: var(--card); color: var(--text); }
     form.add button { background: var(--accent); color: #fff; padding: 0 18px; font-weight: 600; }
     @media (prefers-color-scheme: dark) { form.add button { color: #0d1a12; } }
+    .add-shop { display: flex; align-items: center; gap: 10px; margin: -8px 0 16px; color: var(--muted); font-size: 15px; }
+    .add-shop select { flex: 1; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line);
+      border-radius: 10px; padding: 8px 10px; }
     form.add button.scan-btn { background: var(--card); border: 1px solid var(--line); padding: 0 12px; font-size: 20px; }
 
     /* Barcode scanner */
@@ -174,6 +177,10 @@
     <button type="button" class="scan-btn" id="scanBtn" aria-label="Scan a barcode">📷</button>
     <button type="submit">Add</button>
   </form>
+  <label class="add-shop" id="addShopRow" hidden>
+    <span>Shop</span>
+    <select id="addShop" aria-label="Shop for the new item"></select>
+  </label>
 
   <div class="shopbar" id="shopBar" aria-label="Show items for shop"></div>
 
@@ -262,6 +269,6 @@
   </div>
 </dialog>
 
-<script type="module" src="app.js?v=6"></script>
+<script type="module" src="app.js?v=7"></script>
 </body>
 </html>

@@ -18,7 +18,8 @@ shows up on the other phone straight away.
 - **Tick items off** while you shop. Ticked items move to a "Got" section at the
   bottom.
 - **Shops.** Add your shops (tap **+ Add a shop**, or use ⚙︎). Tap a shop at the
-  top of the list to see only its items; anything you add is put under that shop.
+  top of the list to see only its items. When adding an item, pick its shop from
+  the **Shop** dropdown under the Add box (it picks the usual shop for you).
   Tap **✎** on an item to change its shop. The app remembers which shop each item
   is from.
 - **Finish shop ✓** saves what you ticked as a past shop (with the date) and clears

@@ -1,8 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js?v=6";
+import { firebaseConfig } from "./firebase-config.js?v=7";
 
 // Bump this (and the ?v= in index.html and sw.js) with each update so phones never
 // mix an old app.js with a new index.html.
-const VERSION = 6;
+const VERSION = 7;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
@@ -198,7 +198,7 @@ function renderShopBar() {
     const b = document.createElement("button");
     b.className = "shop-chip" + (shown() === value ? " active" : "");
     b.textContent = label;
-    b.onclick = () => { filter = value; storageSet("shopFilter", value); renderShopBar(); renderItems(); };
+    b.onclick = () => { filter = value; storageSet("shopFilter", value); pickTouched = false; renderShopBar(); renderItems(); renderAddShop(); };
     return b;
   };
   if (shops.length) {
@@ -278,8 +278,27 @@ function renderItems() {
   $("gotCount").textContent = got.length === allGot ? `Got (${allGot})` : `Got (${got.length} here, ${allGot} in total)`;
 }
 
-function addItem(name, extra = {}, metaPatch) {
-  const shop = shown() || rememberedShop(name);
+// The shop a new item goes to unless you pick one: the shop you're viewing, else the
+// shop the item came from last time, else the last shop you picked in the dropdown.
+let lastPicked = null;
+let pickTouched = false; // true once you've changed the dropdown for the item being typed
+const defaultShop = (name) =>
+  shown() || (name && rememberedShop(name)) || (shops.includes(lastPicked) ? lastPicked : null);
+
+function renderAddShop() {
+  const sel = $("addShop");
+  $("addShopRow").hidden = shops.length === 0;
+  const keep = pickTouched ? sel.value : null;
+  sel.replaceChildren(...[["", "No shop"], ...shops.map((s) => [s, s])].map(([value, label]) => {
+    const o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    return o;
+  }));
+  sel.value = keep !== null && (keep === "" || shops.includes(keep)) ? keep : defaultShop($("addInput").value.trim()) || "";
+}
+
+function addItem(name, extra = {}, metaPatch, shop = defaultShop(name)) {
   store.addMany([{ name, order: orderFor(name), shop, ...extra }], metaPatch);
 }
 
@@ -395,7 +414,9 @@ async function lookupBarcode(raw) {
 function addScanned() {
   const name = $("scanName").value.trim();
   if (!name || !scannedCode) return $("scanName").focus();
-  addItem(name, { barcode: scannedCode }, { barcodes: { [scannedCode]: name } });
+  // Use the shop picked in the dropdown, if you picked one before scanning.
+  const shop = pickTouched ? $("addShop").value || null : defaultShop(name);
+  addItem(name, { barcode: scannedCode }, { barcodes: { [scannedCode]: name } }, shop);
   scanReset(`Added ${name} ✓ Scan the next one, or tap Done.`);
   startCamera();
 }
@@ -737,10 +758,19 @@ function wireUp() {
   $("addForm").onsubmit = (e) => {
     e.preventDefault();
     const name = $("addInput").value.trim();
-    if (name) addItem(name);
+    if (name) {
+      const shop = shops.length ? $("addShop").value || null : defaultShop(name);
+      if (pickTouched) lastPicked = shop;
+      addItem(name, {}, undefined, shop);
+    }
     $("addInput").value = "";
+    pickTouched = false;
+    renderAddShop();
     $("addInput").focus();
   };
+  // Follow the item being typed (e.g. "milk" -> Aldi) until you pick a shop yourself.
+  $("addInput").oninput = () => { if (!pickTouched) $("addShop").value = defaultShop($("addInput").value.trim()) || ""; };
+  $("addShop").onchange = () => { pickTouched = true; };
 
   $("finishShop").onclick = finishShop;
   $("priceSave").onclick = () => priceSave?.();
@@ -792,6 +822,7 @@ async function start() {
       barcodes = meta.barcodes || {};
       renderDate(meta.lookFor);
       renderShopBar();
+      renderAddShop();
       renderItems();
       if ($("history").open) renderHistory();
       if ($("settings").open) renderShopSettings();
