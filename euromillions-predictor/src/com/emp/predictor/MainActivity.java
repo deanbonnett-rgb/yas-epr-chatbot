@@ -2,6 +2,10 @@ package com.emp.predictor;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.net.Uri;
+import android.provider.Settings;
 import android.app.TimePickerDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -74,6 +78,8 @@ public class MainActivity extends Activity {
     private boolean typicalOnly = true;
     private List<Predictor.Line> lines = new ArrayList<>();
     private boolean statsByFrequency = false;
+    /** Line to float once the "display over other apps" permission comes back granted, or -1. */
+    private int pendingFloat = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -425,6 +431,14 @@ public class MainActivity extends Activity {
                 }
             });
             body.addView(copyAll, matchWrap(dp(12)));
+            Button floatAll = bigButton("Show numbers over the Lottery app", game.accent);
+            floatAll.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { showFloating(0); }
+            });
+            body.addView(floatAll, matchWrap(dp(8)));
+            body.addView(text("The National Lottery app takes one number per box. Tap any ball above to copy just that "
+                    + "number, or float the numbers over the Lottery app and tap them there as you fill each box.", 12, MUTED),
+                    matchWrap(dp(6)));
         }
 
         String fair = "a fair draw gives " + Predictor.percent(stats.main.fairProbability()) + " for main numbers";
@@ -446,20 +460,27 @@ public class MainActivity extends Activity {
         TextView label = text("Line " + number, 15, TEXT);
         label.setTypeface(Typeface.DEFAULT_BOLD);
         head.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button floatBtn = smallButton("Float", CARD);
+        floatBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showFloating(number - 1); }
+        });
+        head.addView(floatBtn);
         Button copyBtn = smallButton("Copy", game.accent);
         copyBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { copy(line.toClipboardText(), "Line " + number + " copied"); }
         });
-        head.addView(copyBtn);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.leftMargin = dp(6);
+        head.addView(copyBtn, clp);
         c.addView(head);
 
         int size = game.mainCount + line.extra.length > 7 ? 34 : 38;
         LinearLayout balls = horizontal();
         balls.setGravity(Gravity.CENTER_VERTICAL);
-        for (int n : line.main) balls.addView(ball(n, false, size), ballParams(size));
+        for (int n : line.main) balls.addView(copyableBall(n, false, size), ballParams(size));
         if (line.extra.length > 0) {
             balls.addView(new View(this), new LinearLayout.LayoutParams(dp(6), 1));
-            for (int e : line.extra) balls.addView(ball(e, true, size), ballParams(size));
+            for (int e : line.extra) balls.addView(copyableBall(e, true, size), ballParams(size));
         }
         c.addView(balls, matchWrap(dp(10)));
 
@@ -467,6 +488,55 @@ public class MainActivity extends Activity {
         if (line.extra.length > 0) rate += " · " + game.extraName + " " + Predictor.percent(line.extraRate);
         c.addView(text(rate, 12, MUTED), matchWrap(dp(8)));
         return c;
+    }
+
+    /** A ball that copies just its own number: ticket apps take one number per box. */
+    private TextView copyableBall(final int n, boolean extra, int size) {
+        TextView b = ball(n, extra, size);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { copy(String.valueOf(n), n + " copied"); }
+        });
+        return b;
+    }
+
+    /** Floats the generated lines over other apps, asking for the permission first if needed. */
+    private void showFloating(int index) {
+        if (lines.isEmpty()) return;
+        if (!FloatingNumbers.canShow(this)) {
+            pendingFloat = index;
+            new AlertDialog.Builder(this)
+                    .setTitle("Show numbers over other apps")
+                    .setMessage("The National Lottery app takes one number per box, so a whole line can't be pasted in one go. "
+                            + "This shows your numbers in a small panel on top of it: tap a number to copy it, then paste "
+                            + "it into the next box (or just type what you see).\n\n"
+                            + "On the next screen, turn on \"Allow display over other apps\" for Lottery Predictor, then come back.")
+                    .setPositiveButton("Open settings", new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) {
+                            try {
+                                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:" + getPackageName())));
+                            } catch (RuntimeException e) {
+                                Toast.makeText(MainActivity.this, "Open Settings › Apps › Lottery Predictor › Display over other apps",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    })
+                    .setNegativeButton("Not now", null)
+                    .show();
+            return;
+        }
+        FloatingNumbers.show(this, game, lines, index);
+        Toast.makeText(this, "Numbers are floating – now open The National Lottery app", Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (pendingFloat >= 0 && game != null && !lines.isEmpty() && FloatingNumbers.canShow(this)) {
+            int index = Math.min(pendingFloat, lines.size() - 1);
+            pendingFloat = -1;
+            showFloating(index);
+        }
     }
 
     private void copy(String value, String toast) {

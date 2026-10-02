@@ -47,6 +47,12 @@ compare each number only with the draws it could have appeared in, then scale to
 
   Weights are squared to make the favoured numbers stand out, then numbers are sampled at random
   without replacement, so each tap gives different lines.
+- **Entering numbers in The National Lottery app**: its "Type numbers" screen has one box per
+  number, so a whole copied line can't be pasted. Tap any ball to copy just that number, or tap
+  **Show numbers over the Lottery app** (or **Float** on a line) to keep the lines in a small panel
+  on top of other apps. Tap a number in the panel to copy it, and it's dimmed so you can see where
+  you're up to. Use ‹ › for other lines, drag the title to move the panel, and close it with ✕.
+  The first time, Android asks you to allow "Display over other apps".
 - **Typical patterns only** (on by default): redraws lines whose ball total is outside the middle
   90% of draws under today's rules, or that are all odd / all even.
 - **Statistics**: for each number, times drawn, historical chance per draw (vs. a fair draw),
