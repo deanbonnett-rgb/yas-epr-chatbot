@@ -4,6 +4,8 @@ import com.emp.predictor.DrawSchedule;
 import com.emp.predictor.Game;
 import com.emp.predictor.Predictor;
 import com.emp.predictor.Stats;
+import com.emp.predictor.Ticket;
+import com.emp.predictor.TicketChecker;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -192,6 +194,44 @@ public class LogicTest {
         check(DrawSchedule.reminderFor(Game.LOTTO, at(L0, "2026-09-24 18:10"), ukTz, 18, null) == null, "reminder: none when tomorrow has no draw");
         check("2026-09-28".equals(DrawSchedule.reminderFor(Game.SET_FOR_LIFE, at(L0, "2026-09-27 18:00"), ukTz, 18, null)), "reminder: Sunday for Monday's Set For Life");
         check("2026-09-26".equals(DrawSchedule.reminderFor(Game.POWERBALL, at(L0, "2026-09-25 20:00"), ukTz, 18, null)), "reminder: Friday for Saturday's Powerball ticket day");
+
+        // Tickets: save format, checking and prizes.
+        Ticket tk = new Ticket(1L, "thunderball", "2026-09-23", new int[]{34, 8, 2, 3, 4}, new int[]{1}, Ticket.GENERATED, 100, -1);
+        Ticket back = Ticket.decode(tk.encode());
+        check(back.encode().equals(tk.encode()) && back.isValid(), "ticket saves and loads");
+        check(Ticket.decodeAll("garbage\n" + tk.encode() + "\n").size() == 1, "damaged ticket lines are skipped");
+        // Thunderball 23 Sep 2026: 8 18 21 24 34 + TB 1 -> this ticket has 8, 34 and the Thunderball.
+        List<TicketChecker.Result> tr = TicketChecker.check(tk, tbAll);
+        check(tr.size() == 1 && tr.get(0).mainMatches == 2 && tr.get(0).extraMatches == 1
+                && "Match 2 + Thunderball".equals(tr.get(0).tier) && tr.get(0).prizePence == 1000, "Thunderball: Match 2 + Thunderball wins £10");
+        check(TicketChecker.winningsPence(tk, tr) == 1000 && TicketChecker.winningsPence(tk.withEnteredPrize(2500), tr) == 2500,
+                "entered winnings override the worked-out prize");
+        Ticket pending = new Ticket(2L, "thunderball", "2026-10-30", new int[]{1, 2, 3, 4, 5}, new int[]{1}, Ticket.LUCKY_DIP, 100, -1);
+        check(TicketChecker.check(pending, tbAll).isEmpty(), "ticket for a future draw is pending");
+        Ticket lotto2 = new Ticket(3L, "lotto", "2026-09-23", new int[]{1, 2, 3, 11, 12, 30}, new int[0], Ticket.OWN, 200, -1);
+        List<TicketChecker.Result> lr = TicketChecker.check(lotto2, withRounds);
+        check(lr.size() == 2 && "Match 3".equals(lr.get(0).tier) && "Match 2".equals(lr.get(1).tier)
+                && TicketChecker.winningsPence(lotto2, lr) == 1100, "Lotto: each round checked (Match 3 £10 + Match 2 £1)");
+        Ticket lottoBonus = new Ticket(4L, "lotto", "2026-09-23", new int[]{1, 2, 3, 4, 5, 7}, new int[0], Ticket.OWN, 200, -1);
+        check("Match 5 + Bonus Ball".equals(TicketChecker.check(lottoBonus, withRounds).get(0).tier), "Lotto: bonus ball counted for Match 5");
+        Ticket em = new Ticket(5L, "euromillions", "2026-09-22", new int[]{13, 14, 1, 2, 3}, new int[]{10, 1}, Ticket.LUCKY_DIP, 250, -1);
+        List<TicketChecker.Result> er = TicketChecker.check(em, file("assets/euromillions.csv", Game.EUROMILLIONS));
+        check(er.size() == 1 && "Match 2 + 1 Lucky Star".equals(er.get(0).tier) && TicketChecker.needsAmount(em, er),
+                "EuroMillions: Match 2 + 1 Star is a win whose amount the player enters");
+        Ticket sflT = new Ticket(6L, "set_for_life", "2026-09-21", new int[]{24, 28, 37, 1, 2}, new int[]{7}, Ticket.GENERATED, 150, -1);
+        check(TicketChecker.check(sflT, file("assets/set_for_life.csv", Game.SET_FOR_LIFE)).get(0).prizePence == 3000, "Set For Life: Match 3 + Life Ball £30");
+        List<Ticket> all = new ArrayList<>();
+        all.add(tk); all.add(pending); all.add(lotto2);
+        List<List<TicketChecker.Result>> res = new ArrayList<>();
+        res.add(tr); res.add(TicketChecker.check(pending, tbAll)); res.add(lr);
+        int[] tot = TicketChecker.totals(all, res);
+        check(tot[0] == 3 && tot[1] == 400 && tot[2] == 2100 && tot[3] == 2 && tot[4] == 2, "totals: 3 tickets, £4 spent, £21 won");
+        check(Ticket.money(123456).equals("£1,234.56") && Ticket.money(-250).equals("-£2.50") && Ticket.parsePence("£2.50") == 250
+                && Ticket.parsePence("") == -1, "money formatting and parsing");
+        check(DrawSchedule.nextDrawDate(Game.LOTTO, at(L0, "2026-10-03 12:00")).equals("2026-10-03")
+                && DrawSchedule.nextDrawDate(Game.LOTTO, at(L0, "2026-10-03 22:00")).equals("2026-10-07"), "next Lotto draw for a ticket");
+        List<String> around = DrawSchedule.drawDatesAround(Game.LOTTO, at(L0, "2026-10-03 12:00"), 2, 2);
+        check(around.toString().equals("[2026-10-07, 2026-10-03, 2026-09-30, 2026-09-26]"), "draw dates for the ticket form: " + around);
 
         // Draw timing.
         String L = "Europe/London", NY = "America/New_York";

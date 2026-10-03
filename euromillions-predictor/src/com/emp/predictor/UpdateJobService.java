@@ -180,8 +180,36 @@ public class UpdateJobService extends JobService {
             all.append('\n');
         }
         String numbers = all.toString().trim();
+        String tickets = ticketSummary(context, game, night);
         post(context, game, 1, game.name + " results – " + MainActivity.prettyDate(night.get(0).date),
-                numbers.replace('\n', ' '), numbers + "\nStatistics updated – tap to generate new predictions.");
+                tickets != null ? tickets : numbers.replace('\n', ' '),
+                numbers + "\n" + (tickets != null ? tickets : "Statistics updated – tap to generate new predictions."));
+    }
+
+    /** "Your ticket: Match 3 – £10.00" for tickets logged for this draw, or null if there are none. */
+    static String ticketSummary(Context context, Game game, List<Draw> night) {
+        List<Ticket> mine = new ArrayList<>();
+        for (Ticket t : TicketStore.forGame(context, game)) if (t.drawDate.equals(night.get(0).date)) mine.add(t);
+        if (mine.isEmpty()) return null;
+        int winners = 0, pence = 0;
+        boolean variable = false;
+        String best = null;
+        for (Ticket t : mine) {
+            List<TicketChecker.Result> r = TicketChecker.check(t, night);
+            boolean won = false;
+            for (TicketChecker.Result x : r) {
+                if (!x.isWin()) continue;
+                won = true;
+                if (best == null) best = x.tier;
+                if (x.prizePence == TicketChecker.VARIABLE) variable = true;
+            }
+            if (won) winners++;
+            pence += TicketChecker.winningsPence(t, r);
+        }
+        String who = mine.size() == 1 ? "Your ticket" : "Your " + mine.size() + " tickets";
+        if (winners == 0) return who + ": no win this time";
+        String amount = pence > 0 ? Ticket.money(pence) + (variable ? " + prize to check" : "") : "prize to check";
+        return who + ": " + (mine.size() == 1 ? best : winners + " winning") + " – " + amount + " 🎉";
     }
 
     /** Posts a notification that opens {@code game}; results and reminders use separate ids per game. */

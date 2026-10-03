@@ -53,6 +53,19 @@ compare each number only with the draws it could have appeared in, then scale to
   on top of other apps. Tap a number in the panel to copy it, and it's dimmed so you can see where
   you're up to. Use ‹ › for other lines, drag the title to move the panel, and close it with ✕.
   The first time, Android asks you to allow "Display over other apps".
+- **Tickets and winnings log** (Tickets tab in each game):
+  - **I played this line** on a generated line saves it for the next draw, and the line card then
+    shows it's been played.
+  - **Add a ticket** logs a Lucky Dip or your own numbers: pick the draw (recent or upcoming), how
+    the numbers were chosen, tap the numbers, and set the cost (defaults: EuroMillions £2.50,
+    Lotto £2, Set For Life £1.50, Thunderball £1, Powerball £4; the last cost you enter is remembered).
+  - When results are in, each ticket is checked automatically. Matched numbers get a green ring and
+    the tier is shown (both rounds for Lotto). Fixed prizes are filled in: Lotto from 10 Jun 2026
+    £1M / £1,000 / £50 / £10 / £1 per round, Thunderball £500,000 down to £3, Set For Life £250 down
+    to £5. EuroMillions and Powerball prizes change every draw, so you enter what you won with
+    **Winnings**, which can also override any amount.
+  - Totals per game (spent, won, up or down, tickets waiting) and across all games on the games
+    screen. Result notifications also say how your tickets did.
 - **Typical patterns only** (on by default): redraws lines whose ball total is outside the middle
   90% of draws under today's rules, or that are all odd / all even.
 - **Statistics**: for each number, times drawn, historical chance per draw (vs. a fair draw),

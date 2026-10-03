@@ -55,6 +55,8 @@ public final class Game {
     public final String drawNote;
     /** Caveat about the bundled history when it isn't complete, or null. */
     public final String historyNote;
+    /** Price of one line in pence (UK), used as the default ticket cost. */
+    public final int pricePence;
     /** Date from which two draws are made each night (Lotto's rounds), or null. */
     private final String twoRoundsFrom;
     public final String jackpotOdds;
@@ -69,7 +71,7 @@ public final class Game {
         eraStarts = b.eraStarts; mainPools = b.mainPools; extraPools = b.extraPools;
         drawDays = b.drawDays; timeZone = TimeZone.getTimeZone(b.timeZone);
         resultsHour = b.resultsHour; resultsMinute = b.resultsMinute; usDates = b.usDates;
-        snapToDrawDay = b.snapToDrawDay; drawNote = b.drawNote; historyNote = b.historyNote; twoRoundsFrom = b.twoRoundsFrom;
+        snapToDrawDay = b.snapToDrawDay; drawNote = b.drawNote; historyNote = b.historyNote; twoRoundsFrom = b.twoRoundsFrom; pricePence = b.pricePence;
         jackpotOdds = b.jackpotOdds; accent = b.accent; extraColor = b.extraColor; sources = b.sources;
     }
 
@@ -78,6 +80,7 @@ public final class Game {
             .eras(new String[]{"2004-02-13", "2011-05-10", "2016-09-27"}, new int[]{50, 50, 50}, new int[]{9, 11, 12})
             .schedule("Europe/London", 21, 30, Calendar.TUESDAY, Calendar.FRIDAY)
             .look("1 in 139,838,160", 0xFF3D7BFF, 0xFFF5C518)
+            .price(250)
             .sources(new Source(nationalLottery(33), Mode.APPEND_NEWER),
                     new Source("https://www.national-lottery.co.uk/results/euromillions/draw-history/csv", Mode.APPEND_NEWER),
                     new Source("https://raw.githubusercontent.com/daowa89/lottery-archive/main/eu/euromillions/results.csv", Mode.APPEND_NEWER),
@@ -89,6 +92,7 @@ public final class Game {
             .eras(new String[]{"1994-11-19", "2015-10-10"}, new int[]{49, 59}, new int[]{49, 59})
             .schedule("Europe/London", 21, 30, Calendar.WEDNESDAY, Calendar.SATURDAY)
             .look("1 in 45,057,474 per round", 0xFFE5007E, 0xFF9AA3C0)
+            .price(200)
             .note("Two draws (rounds) each night since 10 Jun 2026 – every line plays in both")
             .twoRoundsFrom("2026-06-10")
             .sources(new Source(nationalLottery(1), Mode.APPEND_NEWER),
@@ -102,6 +106,7 @@ public final class Game {
                     new int[]{45, 49, 53, 55, 59, 59, 69}, new int[]{45, 42, 42, 42, 39, 35, 26})
             .schedule("America/New_York", 23, 45, Calendar.MONDAY, Calendar.WEDNESDAY, Calendar.SATURDAY)
             .look("1 in 292,201,338", 0xFFE4002B, 0xFFE4002B)
+            .price(400)
             .usDates()
             .ukTiming("Drawn in the US – results about 4am UK time on Tue, Thu & Sun")
             .sources(new Source("https://raw.githubusercontent.com/jbaranski/jeffs-lottery-utils/main/numbers/powerball.csv", Mode.APPEND_NEWER),
@@ -113,6 +118,7 @@ public final class Game {
             .eras(new String[]{"2019-03-18"}, new int[]{47}, new int[]{10})
             .schedule("Europe/London", 21, 0, Calendar.MONDAY, Calendar.THURSDAY)
             .look("1 in 15,339,390", 0xFF00A3AD, 0xFF00A3AD)
+            .price(150)
             .sources(new Source("https://raw.githubusercontent.com/apkelepouris/predict-for-life-data/main/set_for_life.csv", Mode.APPEND_NEWER),
                     new Source(nationalLottery(3), Mode.APPEND_NEWER))
             .build();
@@ -122,6 +128,7 @@ public final class Game {
             .eras(new String[]{"1999-06-12", "2010-05-09"}, new int[]{34, 39}, new int[]{14, 14})
             .schedule("Europe/London", 21, 0, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.FRIDAY, Calendar.SATURDAY)
             .look("1 in 8,060,598", 0xFF7B3FC4, 0xFF7B3FC4)
+            .price(100)
             .history("Uses the 314 draws available (Dec 2021 – Jun 2022 and Sep 2025 onwards) and adds every new draw")
             .sources(new Source(nationalLottery(4), Mode.APPEND_NEWER),
                     new Source("https://www.national-lottery.co.uk/results/thunderball/draw-history/csv", Mode.APPEND_NEWER))
@@ -206,6 +213,7 @@ public final class Game {
         int mainCount, extraCount;
         boolean extraPicked, extraFromMainDrum, usDates, snapToDrawDay;
         String drawNote, historyNote, twoRoundsFrom;
+        int pricePence;
         String extraName, timeZone, jackpotOdds;
         String[] eraStarts;
         int[] mainPools, extraPools, drawDays;
@@ -237,6 +245,8 @@ public final class Game {
         Builder history(String note) { historyNote = note; return this; }
 
         Builder twoRoundsFrom(String date) { twoRoundsFrom = date; return this; }
+
+        Builder price(int pence) { pricePence = pence; return this; }
 
         Builder sources(Source... s) { sources = s; return this; }
 

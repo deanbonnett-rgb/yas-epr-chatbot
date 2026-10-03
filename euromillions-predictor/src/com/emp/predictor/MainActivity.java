@@ -18,6 +18,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.InputType;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -31,6 +32,7 @@ import android.widget.CompoundButton;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.TimePicker;
@@ -42,6 +44,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -54,6 +59,7 @@ public class MainActivity extends Activity {
     private static final int CARD = Color.parseColor("#17245A");
     private static final int TEXT = Color.WHITE;
     private static final int MUTED = Color.parseColor("#AAB4D4");
+    private static final int GREEN = Color.parseColor("#2ECC71");
 
     private static final int MIN_LINES = 2;
     private static final int MAX_LINES = 10;
@@ -69,7 +75,7 @@ public class MainActivity extends Activity {
     private TextView status;
     private Button updateButton;
     private FrameLayout content;
-    private final Button[] tabs = new Button[3];
+    private final Button[] tabs = new Button[4];
     private int currentTab = 0;
 
     // Predict tab state, kept so switching tabs does not lose generated lines.
@@ -147,7 +153,14 @@ public class MainActivity extends Activity {
             root.addView(c, matchWrap(dp(16)));
             loadSummary(g, info);
         }
-        root.addView(remindersCard(), matchWrap(dp(20)));
+        final TextView ticketSummary = text("My tickets: loading…", 14, TEXT);
+        LinearLayout tc = card();
+        tc.addView(sectionTitle("My tickets"));
+        tc.addView(ticketSummary, matchWrap(dp(4)));
+        tc.addView(text("Open a game's Tickets tab to add or check tickets.", 12, MUTED), matchWrap(dp(2)));
+        root.addView(tc, matchWrap(dp(20)));
+        loadTicketSummary(ticketSummary);
+        root.addView(remindersCard(), matchWrap(dp(16)));
         root.addView(text("Draws are random – no method can change the odds. Play for fun and only spend what you can afford.",
                 12, MUTED), matchWrap(dp(20)));
 
@@ -329,8 +342,8 @@ public class MainActivity extends Activity {
         root.addView(statusRow, matchWrap(dp(8)));
 
         LinearLayout tabRow = horizontal();
-        String[] names = {"Predict", "Statistics", "History"};
-        for (int i = 0; i < 3; i++) {
+        String[] names = {"Predict", "Stats", "History", "Tickets"};
+        for (int i = 0; i < names.length; i++) {
             final int idx = i;
             tabs[i] = smallButton(names[i], CARD);
             tabs[i].setOnClickListener(new View.OnClickListener() {
@@ -357,7 +370,8 @@ public class MainActivity extends Activity {
         body.setPadding(0, dp(12), 0, dp(24));
         if (idx == 0) buildPredict(body);
         else if (idx == 1) buildStats(body);
-        else buildHistory(body);
+        else if (idx == 2) buildHistory(body);
+        else buildTickets(body);
         scroll.addView(body);
         content.addView(scroll);
     }
@@ -487,6 +501,28 @@ public class MainActivity extends Activity {
         String rate = "Rate: main " + Predictor.percent(line.mainRate);
         if (line.extra.length > 0) rate += " · " + game.extraName + " " + Predictor.percent(line.extraRate);
         c.addView(text(rate, 12, MUTED), matchWrap(dp(8)));
+
+        final String drawDate = DrawSchedule.nextDrawDate(game, System.currentTimeMillis());
+        Ticket logged = TicketStore.find(this, game, drawDate, line.main, line.extra);
+        if (logged != null) {
+            TextView played = text("✓ Played for " + prettyDate(drawDate) + " – it's in your Tickets", 13, GREEN);
+            c.addView(played, matchWrap(dp(8)));
+        } else {
+            Button play = smallButton("I played this line (" + prettyDate(drawDate) + ")", BG);
+            play.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    try {
+                        TicketStore.save(MainActivity.this, new Ticket(System.currentTimeMillis(), game.id, drawDate,
+                                line.main, line.extra, Ticket.GENERATED, defaultCost(game), -1));
+                        Toast.makeText(MainActivity.this, "Saved to Tickets – it'll be checked when results are out", Toast.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "Could not save ticket", Toast.LENGTH_SHORT).show();
+                    }
+                    showTab(0);
+                }
+            });
+            c.addView(play, matchWrap(dp(8)));
+        }
         return c;
     }
 
@@ -624,6 +660,302 @@ public class MainActivity extends Activity {
     }
 
     // ---------------------------------------------------------------- History tab
+
+    // ---------------------------------------------------------------- Tickets tab
+
+    private int defaultCost(Game g) {
+        return getSharedPreferences(UpdateJobService.PREFS, MODE_PRIVATE).getInt("cost_" + g.id, g.pricePence);
+    }
+
+    private void buildTickets(LinearLayout body) {
+        List<Ticket> tickets = TicketStore.forGame(this, game);
+        List<List<TicketChecker.Result>> results = new ArrayList<>();
+        for (Ticket t : tickets) results.add(TicketChecker.check(t, draws));
+        int[] tot = TicketChecker.totals(tickets, results);
+
+        LinearLayout sum = card();
+        sum.addView(sectionTitle(game.name + " tickets"));
+        sum.addView(text(String.format(Locale.UK, "%d ticket%s · spent %s · won %s", tot[0], tot[0] == 1 ? "" : "s",
+                Ticket.money(tot[1]), Ticket.money(tot[2])), 14, TEXT), matchWrap(dp(4)));
+        int net = tot[2] - tot[1];
+        sum.addView(text((net >= 0 ? "Up " : "Down ") + Ticket.money(Math.abs(net)) + " · " + tot[4] + " winning ticket"
+                + (tot[4] == 1 ? "" : "s") + " · " + (tot[0] - tot[3]) + " waiting for results", 13, net >= 0 ? GREEN : MUTED), matchWrap(dp(2)));
+        Button add = bigButton("Add a ticket (Lucky Dip or your own numbers)", game.accent);
+        add.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showTicketForm(); }
+        });
+        sum.addView(add, matchWrap(dp(10)));
+        sum.addView(text("Generated lines can be saved with “I played this line” on the Predict tab. Tickets are checked "
+                + "automatically when results are in; fixed prizes are filled in, and you can enter any amount you won.", 12, MUTED),
+                matchWrap(dp(6)));
+        body.addView(sum, matchWrap(0));
+
+        for (int i = 0; i < tickets.size(); i++) body.addView(ticketCard(tickets.get(i), results.get(i)), matchWrap(dp(10)));
+    }
+
+    private View ticketCard(final Ticket t, List<TicketChecker.Result> results) {
+        LinearLayout c = card();
+        c.addView(text(prettyDate(t.drawDate) + " · " + t.source + " · " + (t.costPence >= 0 ? Ticket.money(t.costPence) : "cost not set"),
+                13, MUTED));
+
+        Set<Integer> hitMain = new HashSet<>(), hitExtra = new HashSet<>();
+        for (TicketChecker.Result r : results) {
+            for (int n : t.main) {
+                for (int x : r.draw.main) if (x == n) hitMain.add(n);
+                if (!game.extraPicked) for (int x : r.draw.extra) if (x == n) hitMain.add(n);
+            }
+            for (int e : t.extra) for (int x : r.draw.extra) if (x == e) hitExtra.add(e);
+        }
+        int size = game.mainCount + t.extra.length > 7 ? 32 : 36;
+        LinearLayout balls = horizontal();
+        for (int n : t.main) balls.addView(markedBall(n, false, size, hitMain.contains(n)), ballParams(size));
+        if (t.extra.length > 0) {
+            balls.addView(new View(this), new LinearLayout.LayoutParams(dp(6), 1));
+            for (int e : t.extra) balls.addView(markedBall(e, true, size, hitExtra.contains(e)), ballParams(size));
+        }
+        c.addView(balls, matchWrap(dp(6)));
+
+        if (results.isEmpty()) {
+            c.addView(text("Waiting for the " + prettyDate(t.drawDate) + " results", 14, TEXT), matchWrap(dp(6)));
+        } else {
+            for (int i = 0; i < results.size(); i++) {
+                TicketChecker.Result r = results.get(i);
+                String prefix = results.size() > 1 ? "Round " + (i + 1) + ": " : "";
+                String line;
+                if (!r.isWin()) {
+                    line = prefix + "no win (matched " + r.mainMatches + (game.extraPicked ? " + " + r.extraMatches : "") + ")";
+                } else if (r.prizeNote != null) {
+                    line = prefix + r.tier + " – " + r.prizeNote;
+                } else if (r.prizePence == TicketChecker.VARIABLE) {
+                    line = prefix + r.tier + " – prize varies, check the official results";
+                } else {
+                    line = prefix + r.tier + " – " + Ticket.money(r.prizePence);
+                }
+                c.addView(text(line, 14, r.isWin() ? GREEN : TEXT), matchWrap(dp(4)));
+            }
+            int won = TicketChecker.winningsPence(t, results);
+            String total = t.enteredPrizePence >= 0 ? "Winnings entered: " + Ticket.money(won)
+                    : TicketChecker.needsAmount(t, results) ? "Tap “Winnings” to enter what you won" : "Winnings: " + Ticket.money(won);
+            c.addView(text(total, 13, won > 0 ? GREEN : MUTED), matchWrap(dp(4)));
+        }
+
+        LinearLayout actions = horizontal();
+        Button winnings = smallButton("Winnings", BG);
+        winnings.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showWinningsDialog(t); }
+        });
+        actions.addView(winnings);
+        Button delete = smallButton("Delete", BG);
+        delete.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage("Delete this ticket from your log?")
+                        .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                try {
+                                    TicketStore.delete(MainActivity.this, t.id);
+                                } catch (Exception ignored) {
+                                    // Leave it; the list is redrawn either way.
+                                }
+                                showTab(3);
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dlp.leftMargin = dp(8);
+        actions.addView(delete, dlp);
+        c.addView(actions, matchWrap(dp(8)));
+        return c;
+    }
+
+    private TextView markedBall(int n, boolean extra, int size, boolean hit) {
+        TextView b = ball(n, extra, size);
+        if (hit) {
+            GradientDrawable g = (GradientDrawable) b.getBackground();
+            g.setStroke(dp(4), GREEN);
+        }
+        return b;
+    }
+
+    private void showWinningsDialog(final Ticket t) {
+        final EditText amount = new EditText(this);
+        amount.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        amount.setHint("e.g. 4.20");
+        if (t.enteredPrizePence >= 0) amount.setText(String.format(Locale.UK, "%.2f", t.enteredPrizePence / 100.0));
+        LinearLayout box = vertical();
+        box.setPadding(dp(20), dp(8), dp(20), 0);
+        box.addView(amount);
+        new AlertDialog.Builder(this)
+                .setTitle("Winnings for this ticket (£)")
+                .setMessage("Enter the total this ticket won. Leave it empty to use the prizes worked out from the results.")
+                .setView(box)
+                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        try {
+                            TicketStore.save(MainActivity.this, t.withEnteredPrize(Ticket.parsePence(amount.getText().toString())));
+                        } catch (Exception e) {
+                            Toast.makeText(MainActivity.this, "Could not save", Toast.LENGTH_SHORT).show();
+                        }
+                        showTab(3);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Form for logging a Lucky Dip or your own numbers: draw date, how chosen, numbers and cost. */
+    private void showTicketForm() {
+        final Game g = game;
+        final int extraCount = g.extraPicked ? g.extraCount : 0;
+        final Set<Integer> mainSel = new TreeSet<>(), extraSel = new TreeSet<>();
+        LinearLayout form = vertical();
+        form.setPadding(dp(16), dp(8), dp(16), dp(8));
+
+        form.addView(text("Draw", 13, MUTED));
+        final List<String> dates = DrawSchedule.drawDatesAround(g, System.currentTimeMillis(), 3, 8);
+        String next = DrawSchedule.nextDrawDate(g, System.currentTimeMillis());
+        List<String> dateLabels = new ArrayList<>();
+        for (String d : dates) dateLabels.add(prettyDate(d) + (d.equals(next) ? " (next draw)" : ""));
+        final Spinner date = new Spinner(this);
+        date.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, dateLabels));
+        date.setSelection(dates.indexOf(next));
+        form.addView(date);
+
+        form.addView(text("How were the numbers chosen?", 13, MUTED), matchWrap(dp(8)));
+        final String[] sources = {Ticket.LUCKY_DIP, Ticket.OWN, Ticket.GENERATED};
+        final Spinner source = new Spinner(this);
+        source.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, sources));
+        form.addView(source);
+
+        form.addView(text("Tap your " + g.mainCount + " numbers (1–" + g.currentMainPool() + ")", 13, MUTED), matchWrap(dp(8)));
+        form.addView(numberGrid(g.currentMainPool(), g.mainCount, mainSel, false));
+        if (extraCount > 0) {
+            form.addView(text("Tap your " + (extraCount == 1 ? g.extraName : extraCount + " " + g.extraName)
+                    + " (1–" + g.currentExtraPool() + ")", 13, MUTED), matchWrap(dp(8)));
+            form.addView(numberGrid(g.currentExtraPool(), extraCount, extraSel, true));
+        }
+
+        form.addView(text("Cost of this line (£)", 13, MUTED), matchWrap(dp(8)));
+        final EditText cost = new EditText(this);
+        cost.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        cost.setText(String.format(Locale.UK, "%.2f", defaultCost(g) / 100.0));
+        form.addView(cost);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(form);
+        final AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Add a " + g.name + " ticket")
+                .setView(scroll)
+                .setPositiveButton("Save", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override public void onShow(DialogInterface di) {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        if (mainSel.size() != g.mainCount || extraSel.size() != extraCount) {
+                            Toast.makeText(MainActivity.this, "Pick " + g.mainCount + " numbers"
+                                    + (extraCount > 0 ? " and " + extraCount + " " + g.extraName : ""), Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        int pence = Ticket.parsePence(cost.getText().toString());
+                        Ticket t = new Ticket(System.currentTimeMillis(), g.id, dates.get(date.getSelectedItemPosition()),
+                                toArray(mainSel), toArray(extraSel), sources[source.getSelectedItemPosition()], pence, -1);
+                        try {
+                            TicketStore.save(MainActivity.this, t);
+                            if (pence >= 0) getSharedPreferences(UpdateJobService.PREFS, MODE_PRIVATE).edit().putInt("cost_" + g.id, pence).apply();
+                        } catch (Exception e) {
+                            Toast.makeText(MainActivity.this, "Could not save ticket", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        dialog.dismiss();
+                        showTab(3);
+                    }
+                });
+            }
+        });
+        dialog.show();
+    }
+
+    /** Rows of tappable numbers 1..pool; at most {@code max} can be selected. */
+    private View numberGrid(int pool, final int max, final Set<Integer> selected, final boolean extra) {
+        LinearLayout grid = vertical();
+        LinearLayout row = null;
+        for (int n = 1; n <= pool; n++) {
+            if ((n - 1) % 8 == 0) {
+                row = horizontal();
+                grid.addView(row, matchWrap(dp(4)));
+            }
+            final int num = n;
+            final TextView cell = text(String.valueOf(n), 14, TEXT);
+            cell.setGravity(Gravity.CENTER);
+            cell.setBackground(rounded(CARD, 18));
+            cell.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    if (selected.contains(num)) {
+                        selected.remove(num);
+                        cell.setBackground(rounded(CARD, 18));
+                        cell.setTextColor(TEXT);
+                    } else if (selected.size() < max) {
+                        selected.add(num);
+                        cell.setBackground(rounded(extra ? game.extraColor : Color.WHITE, 18));
+                        cell.setTextColor(extra ? Color.WHITE : BG);
+                    } else {
+                        Toast.makeText(MainActivity.this, "You've picked " + max + " already – tap one to remove it", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(34), dp(34));
+            lp.rightMargin = dp(4);
+            row.addView(cell, lp);
+        }
+        return grid;
+    }
+
+    private static int[] toArray(Set<Integer> set) {
+        int[] a = new int[set.size()];
+        int i = 0;
+        for (int n : set) a[i++] = n;
+        return a;
+    }
+
+    /** Fills in the picker's "My tickets" card: totals across every game. */
+    private void loadTicketSummary(final TextView view) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<Ticket> all = TicketStore.load(MainActivity.this);
+                List<List<TicketChecker.Result>> results = new ArrayList<>();
+                java.util.Map<String, List<Draw>> cache = new java.util.HashMap<>();
+                for (Ticket t : all) {
+                    List<Draw> d = cache.get(t.gameId);
+                    if (d == null) {
+                        try {
+                            d = new ResultsStore(MainActivity.this, t.game()).load();
+                        } catch (Exception e) {
+                            d = new ArrayList<>();
+                        }
+                        cache.put(t.gameId, d);
+                    }
+                    results.add(TicketChecker.check(t, d));
+                }
+                final int[] tot = TicketChecker.totals(all, results);
+                main.post(new Runnable() {
+                    @Override public void run() {
+                        if (tot[0] == 0) {
+                            view.setText("No tickets logged yet");
+                            return;
+                        }
+                        int net = tot[2] - tot[1];
+                        view.setText(String.format(Locale.UK, "%d ticket%s · spent %s · won %s · %s %s", tot[0], tot[0] == 1 ? "" : "s",
+                                Ticket.money(tot[1]), Ticket.money(tot[2]), net >= 0 ? "up" : "down", Ticket.money(Math.abs(net))));
+                    }
+                });
+            }
+        }).start();
+    }
 
     private void buildHistory(LinearLayout body) {
         final Game g = game;

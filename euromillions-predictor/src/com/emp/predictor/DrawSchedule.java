@@ -1,5 +1,6 @@
 package com.emp.predictor;
 
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
@@ -18,6 +19,45 @@ public final class DrawSchedule {
         while (!game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) c.add(Calendar.DAY_OF_MONTH, -1);
         return String.format(Locale.ROOT, "%04d-%02d-%02d",
                 c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+    }
+
+    /** The draw a ticket bought now would be for: today if results aren't out yet, else the next draw day. */
+    public static String nextDrawDate(Game game, long nowMillis) {
+        Calendar c = Calendar.getInstance(game.timeZone, Locale.UK);
+        c.setTimeInMillis(nowMillis);
+        int minutes = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+        if (!game.isDrawDay(c.get(Calendar.DAY_OF_WEEK)) || minutes >= game.resultsHour * 60 + game.resultsMinute) {
+            do {
+                c.add(Calendar.DAY_OF_MONTH, 1);
+            } while (!game.isDrawDay(c.get(Calendar.DAY_OF_WEEK)));
+        }
+        return iso(c);
+    }
+
+    /** Draw dates around now, newest first: {@code ahead} upcoming draws, then {@code back} past ones. */
+    public static List<String> drawDatesAround(Game game, long nowMillis, int ahead, int back) {
+        String next = nextDrawDate(game, nowMillis);
+        Calendar c = utcDate(next);
+        List<String> future = new ArrayList<>();
+        while (future.size() < ahead) {
+            if (game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) future.add(0, iso(c));
+            c.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        List<String> out = new ArrayList<>(future);
+        c = utcDate(next);
+        int found = 0;
+        while (found < back) {
+            c.add(Calendar.DAY_OF_MONTH, -1);
+            if (game.isDrawDay(c.get(Calendar.DAY_OF_WEEK))) {
+                out.add(iso(c));
+                found++;
+            }
+        }
+        return out;
+    }
+
+    private static String iso(Calendar c) {
+        return String.format(Locale.ROOT, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
 
     /** True when a draw should have been published that we don't have yet. */
