@@ -64,6 +64,15 @@ compare each number only with the draws it could have appeared in, then scale to
     £1M / £1,000 / £50 / £10 / £1 per round, Thunderball £500,000 down to £3, Set For Life £250 down
     to £5. EuroMillions and Powerball prizes change every draw, so you enter what you won with
     **Winnings**, which can also override any amount.
+  - **Import from screenshot**: take a screenshot of the ticket in The National Lottery app
+    ("Your ticket" screen), then tap Import from screenshot, or share the screenshot to Lottery
+    Predictor. The text is read on the phone, with no internet, and the app finds the game, each line,
+    Lucky Dip marks, every draw date and the price per line. You tick what to save, giving one ticket
+    per line per draw, and anything already saved is skipped. **Paste ticket text** does the same with
+    text copied from Google Lens. OCR uses
+    [tess-two](https://github.com/rmtheis/tess-two) (Tesseract 3.05, Apache 2.0) with Tesseract's
+    English data (Apache 2.0). Both are downloaded and checksum-verified by `build.sh`, which adds
+    about 10 MB to the APK.
   - Totals per game (spent, won, up or down, tickets waiting) and across all games on the games
     screen. Result notifications also say how your tickets did.
 - **Typical patterns only** (on by default): redraws lines whose ball total is outside the middle

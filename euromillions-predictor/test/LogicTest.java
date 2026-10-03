@@ -6,6 +6,7 @@ import com.emp.predictor.Predictor;
 import com.emp.predictor.Stats;
 import com.emp.predictor.Ticket;
 import com.emp.predictor.TicketChecker;
+import com.emp.predictor.TicketTextParser;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -232,6 +233,28 @@ public class LogicTest {
                 && DrawSchedule.nextDrawDate(Game.LOTTO, at(L0, "2026-10-03 22:00")).equals("2026-10-07"), "next Lotto draw for a ticket");
         List<String> around = DrawSchedule.drawDatesAround(Game.LOTTO, at(L0, "2026-10-03 12:00"), 2, 2);
         check(around.toString().equals("[2026-10-07, 2026-10-03, 2026-09-30, 2026-09-26]"), "draw dates for the ticket form: " + around);
+
+        // Importing a ticket from screenshot text (OCR of a real National Lottery "Your ticket" screen).
+        for (String engine : new String[]{"tess5", "tess3"}) {
+            String ocr = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("test/fixtures/ocr_euromillions_" + engine + ".txt")), "UTF-8");
+            TicketTextParser.Result pr = TicketTextParser.parse(ocr, Game.LOTTO);
+            boolean ok = pr.game == Game.EUROMILLIONS && pr.lines.size() == 2 && pr.validLines() == 2
+                    && java.util.Arrays.toString(pr.lines.get(0).main).equals("[16, 20, 30, 36, 49]")
+                    && java.util.Arrays.toString(pr.lines.get(0).extra).equals("[3, 4]") && !pr.lines.get(0).luckyDip
+                    && java.util.Arrays.toString(pr.lines.get(1).main).equals("[2, 14, 24, 35, 48]")
+                    && java.util.Arrays.toString(pr.lines.get(1).extra).equals("[3, 10]") && pr.lines.get(1).luckyDip
+                    && pr.drawDates.toString().equals("[2026-10-02, 2026-10-06]") && pr.costPerLinePence == 250;
+            check(ok, "import: reads the EuroMillions ticket screenshot text (" + engine + "): game, 2 lines, Lucky Dip, "
+                    + pr.drawDates + ", " + pr.costPerLinePence + "p");
+        }
+        TicketTextParser.Result lens = TicketTextParser.parse("Lotto\nDraw date: Sat 10 Oct 2026\n4 11 23 35 47 58\n", Game.EUROMILLIONS);
+        check(lens.game == Game.LOTTO && lens.validLines() == 1 && lens.drawDates.toString().equals("[2026-10-10]"),
+                "import: pasted text without Line labels");
+        TicketTextParser.Result bad = TicketTextParser.parse("Thunderball\nLine 1: 08 18 21 24 34 01\nLine 2: 08 18 21 2\n"
+                + "Draw summary: Tue 06 Oct 2026 to Sat 10 Oct 2026", Game.LOTTO);
+        check(bad.game == Game.THUNDERBALL && bad.validLines() == 1 && bad.lines.get(1).problem != null
+                && bad.drawDates.toString().equals("[2026-10-06, 2026-10-07, 2026-10-09, 2026-10-10]"),
+                "import: unreadable line flagged; draw summary range expanded to draw days " + bad.drawDates);
 
         // Draw timing.
         String L = "Europe/London", NY = "America/New_York";

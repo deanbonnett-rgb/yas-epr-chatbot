@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
     private boolean statsByFrequency = false;
     /** Line to float once the "display over other apps" permission comes back granted, or -1. */
     private int pendingFloat = -1;
+    private static final int PICK_SCREENSHOT = 7;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,6 +99,7 @@ public class MainActivity extends Activity {
         UpdateJobService.schedule(this);
         Game requested = Game.byId(String.valueOf(getIntent().getStringExtra(UpdateJobService.EXTRA_GAME)));
         if (requested != null) openGame(requested); else showPicker();
+        handleShare(getIntent());
     }
 
     @Override
@@ -105,6 +107,23 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         Game requested = Game.byId(String.valueOf(intent.getStringExtra(UpdateJobService.EXTRA_GAME)));
         if (requested != null) openGame(requested);
+        handleShare(intent);
+    }
+
+    /** A screenshot shared to the app from another app (e.g. Android's screenshot preview). */
+    private void handleShare(Intent intent) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return;
+        Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        intent.setAction(null); // don't import it again when the screen is recreated
+        if (uri != null) importScreenshot(uri);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_SCREENSHOT && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            importScreenshot(data.getData());
+        }
     }
 
     @Override
@@ -685,6 +704,23 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) { showTicketForm(); }
         });
         sum.addView(add, matchWrap(dp(10)));
+        LinearLayout importRow = horizontal();
+        Button fromShot = smallButton("Import from screenshot", BG);
+        fromShot.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { pickScreenshot(); }
+        });
+        importRow.addView(fromShot, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button paste = smallButton("Paste ticket text", BG);
+        paste.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { importPastedText(); }
+        });
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+        plp.leftMargin = dp(8);
+        importRow.addView(paste, plp);
+        sum.addView(importRow, matchWrap(dp(8)));
+        sum.addView(text("Import reads a screenshot of the ticket in The National Lottery app (Your ticket screen) – "
+                + "or share the screenshot straight to Lottery Predictor. You check the numbers before they're saved.", 12, MUTED),
+                matchWrap(dp(4)));
         sum.addView(text("Generated lines can be saved with “I played this line” on the Predict tab. Tickets are checked "
                 + "automatically when results are in; fixed prizes are filled in, and you can enter any amount you won.", 12, MUTED),
                 matchWrap(dp(6)));
@@ -804,6 +840,198 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    // ---------------------------------------------------------------- importing tickets
+
+    private void pickScreenshot() {
+        Intent pick = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);
+        try {
+            startActivityForResult(Intent.createChooser(pick, "Choose the ticket screenshot"), PICK_SCREENSHOT);
+        } catch (RuntimeException e) {
+            Toast.makeText(this, "No app to choose pictures with", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void importPastedText() {
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        CharSequence text = cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0
+                ? cm.getPrimaryClip().getItemAt(0).coerceToText(this) : null;
+        if (text == null || text.toString().trim().isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Nothing to paste")
+                    .setMessage("Copy your ticket's text first – e.g. open the screenshot in Google Lens (or use your phone's "
+                            + "\"select text\" on the screenshot), copy the text, then tap Paste ticket text again.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        showImportReview(TicketTextParser.parse(text.toString(), game != null ? game : Game.EUROMILLIONS), text.toString());
+    }
+
+    private void importScreenshot(final Uri uri) {
+        final AlertDialog busy = new AlertDialog.Builder(this)
+                .setTitle("Reading your ticket…")
+                .setMessage("This takes a few seconds and happens on your phone.")
+                .setCancelable(false)
+                .show();
+        final Game fallback = game != null ? game : Game.EUROMILLIONS;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String text = null, error = null;
+                try {
+                    text = Ocr.read(MainActivity.this, uri);
+                } catch (Throwable e) {
+                    error = e.getMessage();
+                }
+                final String readText = text, readError = error;
+                main.post(new Runnable() {
+                    @Override public void run() {
+                        busy.dismiss();
+                        if (readText == null) {
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle("Couldn't read the screenshot")
+                                    .setMessage((readError != null ? readError + ".\n\n" : "")
+                                            + "You can copy the ticket's text with Google Lens and use Paste ticket text, or add the ticket by hand.")
+                                    .setPositiveButton("OK", null)
+                                    .show();
+                            return;
+                        }
+                        showImportReview(TicketTextParser.parse(readText, fallback), readText);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** Shows what was read; the player ticks what to save. One ticket per line per draw date. */
+    private void showImportReview(final TicketTextParser.Result r, String rawText) {
+        final Game g = r.game;
+        if (r.validLines() == 0) {
+            String shown = rawText.trim();
+            if (shown.length() > 500) shown = shown.substring(0, 500) + "…";
+            new AlertDialog.Builder(this)
+                    .setTitle("No ticket lines found")
+                    .setMessage("Use a screenshot of the ticket itself (the \"Your ticket\" screen with Line 1, Line 2…).\n\nText read:\n" + shown)
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        LinearLayout form = vertical();
+        form.setPadding(dp(16), dp(8), dp(16), dp(8));
+        form.addView(text(g.name + (r.gameFromText ? "" : " (guessed – the game's name wasn't in the text)"), 15, TEXT));
+        if (r.warning != null) form.addView(text(r.warning, 13, Color.parseColor("#FFB347")), matchWrap(dp(4)));
+
+        form.addView(text("Draws", 13, MUTED), matchWrap(dp(10)));
+        final List<String> dates = new ArrayList<>();
+        final List<CheckBox> dateBoxes = new ArrayList<>();
+        Spinner dateSpinner = null;
+        if (!r.drawDates.isEmpty()) {
+            for (String d : r.drawDates) {
+                CheckBox b = new CheckBox(this);
+                b.setText(prettyDate(d));
+                b.setTextColor(TEXT);
+                b.setChecked(true);
+                form.addView(b);
+                dates.add(d);
+                dateBoxes.add(b);
+            }
+        } else {
+            dates.addAll(DrawSchedule.drawDatesAround(g, System.currentTimeMillis(), 3, 8));
+            List<String> labels = new ArrayList<>();
+            for (String d : dates) labels.add(prettyDate(d));
+            dateSpinner = new Spinner(this);
+            dateSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels));
+            dateSpinner.setSelection(dates.indexOf(DrawSchedule.nextDrawDate(g, System.currentTimeMillis())));
+            form.addView(text("No draw date found – choose one:", 12, MUTED));
+            form.addView(dateSpinner);
+        }
+        final Spinner chosenDate = dateSpinner;
+
+        form.addView(text("Lines", 13, MUTED), matchWrap(dp(10)));
+        final List<TicketTextParser.Line> valid = new ArrayList<>();
+        final List<CheckBox> lineBoxes = new ArrayList<>();
+        for (TicketTextParser.Line l : r.lines) {
+            if (l.problem != null) {
+                form.addView(text("Line " + l.number + " couldn't be read (\"" + l.problem + "\") – add it by hand afterwards",
+                        13, Color.parseColor("#FFB347")), matchWrap(dp(4)));
+                continue;
+            }
+            CheckBox b = new CheckBox(this);
+            b.setText("Line " + l.number + ":  " + join(l.main) + (l.extra.length > 0 ? "  +  " + join(l.extra) : "")
+                    + "\n" + sourceFor(g, l));
+            b.setTextColor(TEXT);
+            b.setChecked(true);
+            form.addView(b);
+            valid.add(l);
+            lineBoxes.add(b);
+        }
+
+        form.addView(text("Cost per line per draw (£)", 13, MUTED), matchWrap(dp(10)));
+        final EditText cost = new EditText(this);
+        cost.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        cost.setText(String.format(Locale.UK, "%.2f", (r.costPerLinePence >= 0 ? r.costPerLinePence : defaultCost(g)) / 100.0));
+        form.addView(cost);
+        form.addView(text("Please check the numbers against your ticket before saving.", 12, MUTED), matchWrap(dp(6)));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(form);
+        new AlertDialog.Builder(this)
+                .setTitle("Import " + g.name + " ticket")
+                .setView(scroll)
+                .setPositiveButton("Save tickets", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        List<String> chosen = new ArrayList<>();
+                        if (chosenDate != null) chosen.add(dates.get(chosenDate.getSelectedItemPosition()));
+                        else for (int i = 0; i < dates.size(); i++) if (dateBoxes.get(i).isChecked()) chosen.add(dates.get(i));
+                        int pence = Ticket.parsePence(cost.getText().toString());
+                        int saved = 0, skipped = 0;
+                        long id = System.currentTimeMillis();
+                        for (int i = 0; i < valid.size(); i++) {
+                            if (!lineBoxes.get(i).isChecked()) continue;
+                            TicketTextParser.Line l = valid.get(i);
+                            for (String date : chosen) {
+                                if (TicketStore.find(MainActivity.this, g, date, l.main, l.extra) != null) {
+                                    skipped++;
+                                    continue;
+                                }
+                                try {
+                                    TicketStore.save(MainActivity.this, new Ticket(id++, g.id, date, l.main, l.extra, sourceFor(g, l), pence, -1));
+                                    saved++;
+                                } catch (Exception e) {
+                                    Toast.makeText(MainActivity.this, "Could not save a ticket", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+                        Toast.makeText(MainActivity.this, "Saved " + saved + " ticket" + (saved == 1 ? "" : "s")
+                                + (skipped > 0 ? " (" + skipped + " already saved)" : ""), Toast.LENGTH_LONG).show();
+                        if (game != g) {
+                            openGame(g);
+                            currentTab = 3;
+                        } else {
+                            showTab(3);
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Lucky Dip if the ticket says so; Generated if it's one of the lines on the Predict tab; else My numbers. */
+    private String sourceFor(Game g, TicketTextParser.Line l) {
+        if (l.luckyDip) return Ticket.LUCKY_DIP;
+        if (g == game) {
+            for (Predictor.Line p : lines) {
+                if (java.util.Arrays.equals(p.main, l.main) && java.util.Arrays.equals(p.extra, l.extra)) return Ticket.GENERATED;
+            }
+        }
+        return Ticket.OWN;
+    }
+
+    private static String join(int[] nums) {
+        StringBuilder sb = new StringBuilder();
+        for (int n : nums) sb.append(sb.length() > 0 ? " " : "").append(String.format(Locale.UK, "%02d", n));
+        return sb.toString();
     }
 
     /** Form for logging a Lucky Dip or your own numbers: draw date, how chosen, numbers and cost. */
