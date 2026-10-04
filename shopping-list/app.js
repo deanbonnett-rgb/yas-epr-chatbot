@@ -1,8 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js?v=7";
+import { firebaseConfig } from "./firebase-config.js?v=8";
 
 // Bump this (and the ?v= in index.html and sw.js) with each update so phones never
 // mix an old app.js with a new index.html.
-const VERSION = 7;
+const VERSION = 8;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
@@ -743,11 +743,12 @@ function wireUp() {
   };
   $("pickBtn").onclick = openPicker;
   $("dateValue").onclick = openPicker;
-  $("datePicker").onchange = (e) => e.target.value && store.setMeta({ lookFor: e.target.value });
+  $("datePicker").onchange = (e) => { if (e.target.value) store.setMeta({ lookFor: e.target.value }); };
 
   $("scanBtn").onclick = openScanner;
   $("scanAdd").onclick = addScanned;
-  $("scanName").onkeydown = (e) => e.key === "Enter" && addScanned();
+  // Braces matter: a key handler that returns false blocks the key (e.g. Backspace).
+  $("scanName").onkeydown = (e) => { if (e.key === "Enter") addScanned(); };
   $("scanDone").onclick = () => $("scanDialog").close();
   $("scanDialog").onclose = () => { stopCamera(); scannedCode = null; };
   $("scanManual").onclick = () => {
@@ -775,11 +776,11 @@ function wireUp() {
   $("finishShop").onclick = finishShop;
   $("priceSave").onclick = () => priceSave?.();
   $("priceCancel").onclick = () => $("priceDialog").close();
-  $("priceFields").onkeydown = (e) => e.key === "Enter" && priceSave?.();
+  $("priceFields").onkeydown = (e) => { if (e.key === "Enter") priceSave?.(); };
 
   $("editSave").onclick = saveEdit;
   $("editCancel").onclick = () => $("editDialog").close();
-  $("editName").onkeydown = (e) => e.key === "Enter" && saveEdit();
+  $("editName").onkeydown = (e) => { if (e.key === "Enter") saveEdit(); };
 
   $("historyBtn").onclick = () => { renderHistory(); $("history").showModal(); };
   $("closeHistory").onclick = () => $("history").close();
