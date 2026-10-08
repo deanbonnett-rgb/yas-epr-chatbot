@@ -2,7 +2,9 @@ package app.parkedvideo
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
@@ -25,6 +27,7 @@ class MainActivity : Activity() {
         status = TextView(this).apply {
             textSize = 16f
             setPadding(0, pad / 2, 0, pad / 2)
+            setTextIsSelectable(true)
         }
         val instructions = TextView(this).apply {
             setText(R.string.setup_instructions)
@@ -54,7 +57,37 @@ class MainActivity : Activity() {
         val location = granted(Manifest.permission.ACCESS_FINE_LOCATION)
         val carSpeed = granted(CAR_SPEED)
         status.text = "Car speed: ${if (carSpeed) "allowed" else "not allowed"}\n" +
-            "Phone location: ${if (location) "allowed" else "not allowed"}"
+            "Phone location: ${if (location) "allowed" else "not allowed"}\n\n" +
+            "Diagnostics\n" + diagnostics()
+    }
+
+    /** What Android Auto sees when deciding whether to list this app. */
+    private fun diagnostics(): String {
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                packageManager.getInstallSourceInfo(packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getInstallerPackageName(packageName)
+            }
+        } catch (e: Exception) {
+            null
+        }
+        val carService = Intent(CAR_APP_SERVICE).setPackage(packageName)
+        val registered = packageManager.queryIntentServices(carService, 0).isNotEmpty()
+        val navigation = packageManager.queryIntentServices(
+            Intent(carService).addCategory(NAVIGATION_CATEGORY), 0,
+        ).isNotEmpty()
+        val androidAuto = try {
+            packageManager.getPackageInfo(ANDROID_AUTO, 0).versionName
+        } catch (e: PackageManager.NameNotFoundException) {
+            "not found"
+        }
+        return "Installed by: ${installer ?: "unknown"}\n" +
+            "Car app service: ${if (registered) "registered" else "MISSING"}\n" +
+            "Navigation category: ${if (navigation) "yes" else "MISSING"}\n" +
+            "Android Auto version: $androidAuto\n" +
+            "App version: ${packageManager.getPackageInfo(packageName, 0).versionName}"
     }
 
     private fun granted(permission: String) =
@@ -62,6 +95,9 @@ class MainActivity : Activity() {
 
     private companion object {
         const val REQUEST_CODE = 1
+        const val CAR_APP_SERVICE = "androidx.car.app.CarAppService"
+        const val NAVIGATION_CATEGORY = "androidx.car.app.category.NAVIGATION"
+        const val ANDROID_AUTO = "com.google.android.projection.gearhead"
         const val CAR_SPEED = "com.google.android.gms.permission.CAR_SPEED"
         val PERMISSIONS = arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
