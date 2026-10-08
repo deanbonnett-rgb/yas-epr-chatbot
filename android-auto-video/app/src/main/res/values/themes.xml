@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ParkedVideo" parent="android:Theme.Material.Light.DarkActionBar" />
+    <!-- Used for the window drawn onto the car screen. -->
+    <style name="Theme.ParkedVideo.Car" parent="android:Theme.Material.NoActionBar.Fullscreen" />
+</resources>

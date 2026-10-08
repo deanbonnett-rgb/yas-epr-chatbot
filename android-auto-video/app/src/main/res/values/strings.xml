@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Parked Video</string>
+    <string name="grant_permissions">Grant speed &amp; location permissions</string>
+    <string name="setup_instructions">Parked Video plays web video (YouTube, Vimeo, Twitch…) on your Android Auto screen while the car is parked.\n\nOne-time setup:\n\n1. Tap the button above and allow the permissions. They let the app tell whether the car is moving.\n\n2. Open Android Auto settings on this phone, scroll to the bottom and tap \"Version\" 10 times to turn on developer mode.\n\n3. In the ⋮ menu choose \"Developer settings\" and turn on \"Unknown sources\".\n\n4. Connect to your car. Parked Video appears in the Android Auto app launcher.\n\nVideo is covered and paused whenever the car is moving or its speed can\'t be read.\n\nNetflix, Disney+, Prime Video and other DRM-protected services won\'t play on the car screen.</string>
+</resources>
