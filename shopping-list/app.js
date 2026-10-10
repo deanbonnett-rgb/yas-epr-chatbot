@@ -1,8 +1,8 @@
-import { firebaseConfig } from "./firebase-config.js?v=10";
+import { firebaseConfig } from "./firebase-config.js?v=11";
 
 // Bump this (and the ?v= in index.html and sw.js) with each update so phones never
 // mix an old app.js with a new index.html.
-const VERSION = 10;
+const VERSION = 11;
 
 const $ = (id) => document.getElementById(id);
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
