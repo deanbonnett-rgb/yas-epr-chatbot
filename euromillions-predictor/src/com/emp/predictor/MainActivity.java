@@ -75,7 +75,7 @@ public class MainActivity extends Activity {
     private TextView status;
     private Button updateButton;
     private FrameLayout content;
-    private final Button[] tabs = new Button[4];
+    private final Button[] tabs = new Button[5];
     private int currentTab = 0;
 
     // Predict tab state, kept so switching tabs does not lose generated lines.
@@ -361,10 +361,12 @@ public class MainActivity extends Activity {
         root.addView(statusRow, matchWrap(dp(8)));
 
         LinearLayout tabRow = horizontal();
-        String[] names = {"Predict", "Stats", "History", "Tickets"};
+        String[] names = {"Predict", "Stats", "History", "Tickets", "Prizes"};
         for (int i = 0; i < names.length; i++) {
             final int idx = i;
             tabs[i] = smallButton(names[i], CARD);
+            tabs[i].setTextSize(13);
+            tabs[i].setPadding(dp(2), dp(8), dp(2), dp(8));
             tabs[i].setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { showTab(idx); }
             });
@@ -390,7 +392,8 @@ public class MainActivity extends Activity {
         if (idx == 0) buildPredict(body);
         else if (idx == 1) buildStats(body);
         else if (idx == 2) buildHistory(body);
-        else buildTickets(body);
+        else if (idx == 3) buildTickets(body);
+        else buildPrizes(body);
         scroll.addView(body);
         content.addView(scroll);
     }
@@ -679,6 +682,79 @@ public class MainActivity extends Activity {
     }
 
     // ---------------------------------------------------------------- History tab
+
+    // ---------------------------------------------------------------- Prizes tab
+
+    /** Prize breakdown: every tier with its prize and exact odds, plus how the player's tickets have done. */
+    private void buildPrizes(LinearLayout body) {
+        String today = DrawSchedule.nextDrawDate(game, System.currentTimeMillis());
+        List<Prizes.Tier> tiers = Prizes.tiers(game, today);
+
+        // How the player's logged tickets have done in each tier.
+        java.util.Map<String, Integer> hits = new java.util.HashMap<>();
+        java.util.Map<String, Integer> won = new java.util.HashMap<>();
+        for (Ticket t : TicketStore.forGame(this, game)) {
+            for (TicketChecker.Result r : TicketChecker.check(t, draws)) {
+                if (!r.isWin()) continue;
+                Integer n = hits.get(r.tier);
+                hits.put(r.tier, n == null ? 1 : n + 1);
+                if (r.prizePence > 0) {
+                    Integer w = won.get(r.tier);
+                    won.put(r.tier, (w == null ? 0 : w) + r.prizePence);
+                }
+            }
+        }
+
+        LinearLayout head = card();
+        head.addView(sectionTitle(game.name + " prize breakdown"));
+        head.addView(text(game.formatDescription() + " · " + Ticket.money(game.pricePence) + " a line · draws "
+                + game.drawDaysText(), 13, MUTED), matchWrap(dp(4)));
+        double any = Prizes.anyPrize(game, today);
+        String chance = "Chance of winning a prize: " + Prizes.oddsText(any) + " per line";
+        if (game.drawsOn(today) == 2) {
+            chance = "Chance of a prize in each round: " + Prizes.oddsText(any) + ". Every line plays both rounds, so about "
+                    + Prizes.oddsText(1 - (1 - any) * (1 - any)) + " per line.";
+        }
+        head.addView(text(chance, 14, TEXT), matchWrap(dp(8)));
+        if (game == Game.EUROMILLIONS || game == Game.POWERBALL) {
+            head.addView(text("Prize amounts change every draw (they depend on ticket sales and how many people win), so "
+                    + "only the odds are shown. Enter what you won on the Tickets tab.", 12, MUTED), matchWrap(dp(6)));
+        } else if (game == Game.LOTTO) {
+            head.addView(text("Fixed prizes are paid per round (two rounds per draw since 10 Jun 2026). The jackpot is shared.",
+                    12, MUTED), matchWrap(dp(6)));
+        }
+        body.addView(head, matchWrap(0));
+
+        LinearLayout table = card();
+        table.addView(tierRow("Match", "Prize", "Odds", MUTED, true), matchWrap(0));
+        for (Prizes.Tier t : tiers) {
+            String prize = t.prizePence >= 0 ? Ticket.money(t.prizePence) + (t.note != null ? "\n" + t.note : "")
+                    : t.note != null ? t.note : "Varies";
+            table.addView(tierRow(t.name, prize, Prizes.oddsText(Prizes.probability(game, t)), TEXT, false), matchWrap(dp(10)));
+            Integer n = hits.get(t.name);
+            if (n != null) {
+                Integer w = won.get(t.name);
+                table.addView(text("Your tickets: " + n + " win" + (n == 1 ? "" : "s") + (w != null ? " · " + Ticket.money(w) : ""),
+                        12, GREEN), matchWrap(dp(2)));
+            }
+        }
+        body.addView(table, matchWrap(dp(12)));
+        body.addView(text("Odds are exact, worked out from the game's rules (" + game.formatDescription() + "). Prize amounts "
+                + "are The National Lottery's published UK prizes; check the official results if in doubt.", 12, MUTED), matchWrap(dp(10)));
+    }
+
+    private View tierRow(String name, String prize, String odds, int color, boolean header) {
+        LinearLayout row = horizontal();
+        TextView n = text(name, header ? 12 : 14, color);
+        TextView p = text(prize, header ? 12 : 14, color);
+        TextView o = text(odds, header ? 12 : 13, header ? color : MUTED);
+        if (!header) n.setTypeface(Typeface.DEFAULT_BOLD);
+        o.setGravity(Gravity.END);
+        row.addView(n, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f));
+        row.addView(p, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.1f));
+        row.addView(o, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.1f));
+        return row;
+    }
 
     // ---------------------------------------------------------------- Tickets tab
 

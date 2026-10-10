@@ -3,6 +3,7 @@ import com.emp.predictor.DrawParser;
 import com.emp.predictor.DrawSchedule;
 import com.emp.predictor.Game;
 import com.emp.predictor.Predictor;
+import com.emp.predictor.Prizes;
 import com.emp.predictor.Stats;
 import com.emp.predictor.Ticket;
 import com.emp.predictor.TicketChecker;
@@ -255,6 +256,30 @@ public class LogicTest {
         check(bad.game == Game.THUNDERBALL && bad.validLines() == 1 && bad.lines.get(1).problem != null
                 && bad.drawDates.toString().equals("[2026-10-06, 2026-10-07, 2026-10-09, 2026-10-10]"),
                 "import: unreadable line flagged; draw summary range expanded to draw days " + bad.drawDates);
+
+        // Prize breakdown: exact odds from the rules match the published figures.
+        String today = "2026-10-10";
+        java.util.function.BiFunction<Game, String, Long> oneIn = new java.util.function.BiFunction<Game, String, Long>() {
+            public Long apply(Game g, String tierName) {
+                for (Prizes.Tier t : Prizes.tiers(g, today)) if (t.name.equals(tierName)) return (long) Math.ceil(1 / Prizes.probability(g, t) - 1e-6);
+                return -1L;
+            }
+        };
+        check(oneIn.apply(Game.EUROMILLIONS, "Match 5 + 2 Lucky Stars – jackpot") == 139_838_160L, "odds: EuroMillions jackpot 1 in 139,838,160");
+        check(oneIn.apply(Game.LOTTO, "Match 6 – jackpot") == 45_057_474L && oneIn.apply(Game.LOTTO, "Match 5 + Bonus Ball") == 7_509_579L,
+                "odds: Lotto jackpot 1 in 45,057,474, 5 + Bonus 1 in 7,509,579");
+        check(oneIn.apply(Game.THUNDERBALL, "Match 5 + Thunderball") == 8_060_598L && oneIn.apply(Game.THUNDERBALL, "Match 4") == 3_648L
+                && oneIn.apply(Game.THUNDERBALL, "Match 0 + Thunderball") == 29L, "odds: Thunderball tiers match published odds");
+        check(oneIn.apply(Game.SET_FOR_LIFE, "Match 5 + Life Ball") == 15_339_390L && oneIn.apply(Game.SET_FOR_LIFE, "Match 2") == 15L
+                && oneIn.apply(Game.SET_FOR_LIFE, "Match 4 + Life Ball") == 73_045L, "odds: Set For Life tiers match published odds");
+        check(oneIn.apply(Game.POWERBALL, "Match 5 + Powerball – jackpot") == 292_201_338L, "odds: Powerball jackpot 1 in 292,201,338");
+        for (Game g : Game.ALL) {
+            System.out.println("  any prize, " + g.name + ": 1 in " + String.format("%.1f", 1 / Prizes.anyPrize(g, today)));
+        }
+        // Tickets saved by v2.4/2.5 still load unchanged.
+        Ticket saved = Ticket.decode("1759401480000|euromillions|2026-10-06|2,14,24,35,48|3,10|Lucky Dip|250|-1");
+        check(saved.isValid() && saved.encode().equals("1759401480000|euromillions|2026-10-06|2,14,24,35,48|3,10|Lucky Dip|250|-1"),
+                "tickets saved by earlier versions load unchanged");
 
         // Draw timing.
         String L = "Europe/London", NY = "America/New_York";

@@ -6,7 +6,7 @@ import java.util.List;
 /** Checks tickets against the draw results and works out prize tiers and fixed prizes. */
 public final class TicketChecker {
     /** Prize for a tier that isn't a fixed amount (jackpots, EuroMillions and Powerball tiers). */
-    public static final int VARIABLE = -1;
+    public static final int VARIABLE = Prizes.VARIABLE;
 
     private TicketChecker() {}
 
@@ -48,78 +48,11 @@ public final class TicketChecker {
     static Result check(Game g, Ticket t, Draw d) {
         int main = count(t.main, d.main);
         int extra = g.extraPicked ? count(t.extra, d.extra) : count(t.main, d.extra);
-        if (g == Game.LOTTO) return lotto(d, main, extra);
-        if (g == Game.THUNDERBALL) return thunderball(d, main, extra);
-        if (g == Game.SET_FOR_LIFE) return setForLife(d, main, extra);
-        if (g == Game.EUROMILLIONS) return euroMillions(d, main, extra);
-        return powerball(d, main, extra);
-    }
-
-    private static Result lotto(Draw d, int main, int bonus) {
-        boolean newFormat = d.date.compareTo("2026-06-10") >= 0;
-        if (main == 6) return win(d, main, bonus, "Match 6 – jackpot", VARIABLE);
-        if (main == 5 && bonus == 1) return win(d, main, bonus, "Match 5 + Bonus Ball", 100_000_000);
-        if (main == 5) return win(d, main, bonus, "Match 5", newFormat ? 100_000 : 175_000);
-        if (main == 4) return win(d, main, bonus, "Match 4", newFormat ? 5_000 : 14_000);
-        if (main == 3) return win(d, main, bonus, "Match 3", newFormat ? 1_000 : 3_000);
-        if (main == 2) {
-            return newFormat ? win(d, main, bonus, "Match 2", 100)
-                    : new Result(d, main, bonus, "Match 2", 200, "Free Lucky Dip");
-        }
-        return none(d, main, bonus);
-    }
-
-    private static Result thunderball(Draw d, int main, int tb) {
-        int[][] table = { // main, thunderball, prize pence
-                {5, 1, 50_000_000}, {5, 0, 500_000}, {4, 1, 25_000}, {4, 0, 10_000}, {3, 1, 2_000},
-                {3, 0, 1_000}, {2, 1, 1_000}, {1, 1, 500}, {0, 1, 300}};
-        for (int[] row : table) {
-            if (main == row[0] && tb == row[1]) {
-                return win(d, main, tb, "Match " + main + (tb == 1 ? " + Thunderball" : ""), row[2]);
-            }
-        }
-        return none(d, main, tb);
-    }
-
-    private static Result setForLife(Draw d, int main, int life) {
-        if (main == 5 && life == 1) return new Result(d, main, life, "Match 5 + Life Ball", VARIABLE, "£10,000 a month for 30 years");
-        if (main == 5) return new Result(d, main, life, "Match 5", VARIABLE, "£10,000 a month for 1 year");
-        int[][] table = {{4, 1, 25_000}, {4, 0, 5_000}, {3, 1, 3_000}, {3, 0, 2_000}, {2, 1, 1_000}, {2, 0, 500}};
-        for (int[] row : table) {
-            if (main == row[0] && life == row[1]) return win(d, main, life, "Match " + main + (life == 1 ? " + Life Ball" : ""), row[2]);
-        }
-        return none(d, main, life);
-    }
-
-    private static Result euroMillions(Draw d, int main, int stars) {
-        // Prize amounts depend on ticket sales and winners, so the player enters what they won.
-        int[][] winning = {{5, 2}, {5, 1}, {5, 0}, {4, 2}, {4, 1}, {3, 2}, {4, 0}, {2, 2}, {3, 1}, {3, 0}, {1, 2}, {2, 1}, {2, 0}};
-        for (int[] w : winning) {
-            if (main == w[0] && stars == w[1]) {
-                String tier = "Match " + main + (stars > 0 ? " + " + stars + (stars == 1 ? " Lucky Star" : " Lucky Stars") : "");
-                return win(d, main, stars, main == 5 && stars == 2 ? tier + " – jackpot" : tier, VARIABLE);
-            }
-        }
-        return none(d, main, stars);
-    }
-
-    private static Result powerball(Draw d, int main, int pb) {
-        int[][] winning = {{5, 1}, {5, 0}, {4, 1}, {4, 0}, {3, 1}, {3, 0}, {2, 1}, {1, 1}, {0, 1}};
-        for (int[] w : winning) {
-            if (main == w[0] && pb == w[1]) {
-                String tier = "Match " + main + (pb == 1 ? " + Powerball" : "");
-                return win(d, main, pb, main == 5 && pb == 1 ? tier + " – jackpot" : tier, VARIABLE);
-            }
-        }
-        return none(d, main, pb);
-    }
-
-    private static Result win(Draw d, int main, int extra, String tier, int pence) {
-        return new Result(d, main, extra, tier, pence, null);
-    }
-
-    private static Result none(Draw d, int main, int extra) {
-        return new Result(d, main, extra, null, 0, null);
+        Prizes.Tier tier = Prizes.tierFor(g, d.date, main, extra);
+        if (tier == null) return new Result(d, main, extra, null, 0, null);
+        // Notes describe how a prize is paid (Free Lucky Dip, monthly prizes); a jackpot's note isn't needed on a ticket.
+        boolean jackpot = tier.prizePence == VARIABLE && (tier.note == null || !tier.note.contains("a month"));
+        return new Result(d, main, extra, tier.name, tier.prizePence, jackpot ? null : tier.note);
     }
 
     private static int count(int[] picked, int[] drawn) {

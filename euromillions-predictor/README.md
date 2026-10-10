@@ -75,6 +75,11 @@ compare each number only with the draws it could have appeared in, then scale to
     about 10 MB to the APK.
   - Totals per game (spent, won, up or down, tickets waiting) and across all games on the games
     screen. Result notifications also say how your tickets did.
+- **Prizes tab**: each game's prize breakdown. It lists every winning tier with its prize (UK
+  fixed prizes, Set For Life's monthly prizes, or "varies" for EuroMillions and Powerball, whose
+  amounts change every draw) and the exact odds, worked out from the game's rules and rounded
+  like the official tables. It also shows the chance of any prize per line (for Lotto, per round
+  and per line), and how many of your logged tickets won each tier.
 - **Typical patterns only** (on by default): redraws lines whose ball total is outside the middle
   90% of draws under today's rules, or that are all odd / all even.
 - **Statistics**: for each number, times drawn, historical chance per draw (vs. a fair draw),

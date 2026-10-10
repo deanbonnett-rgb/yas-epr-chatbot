@@ -4,5 +4,5 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out=build/test-classes
 rm -rf "$out" && mkdir -p "$out"
-javac -d "$out" src/com/emp/predictor/{Game,Draw,DrawParser,DrawSchedule,Stats,Predictor,Ticket,TicketChecker,TicketTextParser}.java test/LogicTest.java
+javac -d "$out" src/com/emp/predictor/{Game,Draw,DrawParser,DrawSchedule,Stats,Predictor,Ticket,TicketChecker,TicketTextParser,Prizes}.java test/LogicTest.java
 java -cp "$out" LogicTest
