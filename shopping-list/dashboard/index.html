@@ -131,7 +131,8 @@
   .lswitch span { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 3px var(--shadow); transition: transform .15s ease; }
   .lswitch.is-on { background: var(--accent); }
   .lswitch.is-on span { transform: translateX(22px); }
-  .lights-meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); margin-top: -4px; }
+  .lights-meta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--muted); margin-top: -4px; }
+  .lights-meta > span:last-child { white-space: nowrap; }
   .adjust { display: flex; flex-direction: column; gap: 8px; }
   .adjust-label { font-size: 14px; color: var(--muted); }
   .adjust.disabled .swatches, .adjust.disabled .bright-row, .adjust.disabled #sceneBtn { opacity: .4; pointer-events: none; }
@@ -243,7 +244,7 @@
     <div class="lights-body" id="lightsBody" hidden>
       <div class="row"><button class="btn" id="allOn">All on</button><button class="btn secondary" id="allOff">All off</button></div>
       <ul class="lights" id="lightList"></ul>
-      <div class="lights-meta"><span id="lightsChecked"></span><button class="link-btn" id="lightsRefresh">Refresh</button></div>
+      <div class="lights-meta"><span id="lightsChecked"></span><span><button class="link-btn" id="lightsChoose">Choose lights</button> <button class="link-btn" id="lightsRefresh">Refresh</button></span></div>
       <div class="adjust disabled" id="adjust">
         <div class="adjust-label" id="adjustLabel">Tap a light's name to change its colour or brightness</div>
         <div class="swatches" id="swatches">
@@ -334,6 +335,8 @@
     <div class="shop-pick" id="evWho"></div>
     <div class="field-label">Repeats</div>
     <div class="shop-pick" id="evRepeat"></div>
+    <div class="field-label">Reminder</div>
+    <div class="shop-pick" id="evRemind"></div>
     <p class="field-error" id="evError" hidden></p>
     <div class="row">
       <button type="button" class="btn secondary" id="evCancel">Cancel</button>
@@ -359,7 +362,7 @@
 
 <dialog id="settingsDialog">
   <h2>Dashboard settings</h2>
-  <p>These settings are kept on this device only.</p>
+  <p>The list, lights and reminder settings are for this device. Football teams are shared.</p>
   <div class="field-label">Shopping list code</div>
   <p id="setListCode" style="margin-top:0"></p>
   <button class="link-btn danger" id="setForgetList">Disconnect this device from the list</button>
@@ -367,6 +370,16 @@
   <div class="field-label">Lights</div>
   <p id="setLights" style="margin-top:0"></p>
   <button class="link-btn danger" id="setForgetLights">Forget the lights connector on this device</button>
+  <hr>
+  <div class="field-label">Reminders on this device</div>
+  <p style="margin-top:0" id="pushIntro">Get a notification before calendar events. Choose whose reminders this device gets.</p>
+  <div class="shop-pick" id="pushWho" style="margin-bottom:8px"></div>
+  <div class="row" style="flex-wrap:wrap">
+    <button class="btn" id="pushOn" type="button">Turn on reminders</button>
+    <button class="btn secondary" id="pushTest" type="button" hidden>Send a test</button>
+  </div>
+  <button class="link-btn danger" id="pushOff" type="button" hidden style="margin-top:6px">Turn off reminders on this device</button>
+  <p class="status" id="pushStatus" style="margin-top:6px"></p>
   <hr>
   <div class="field-label">Football fixtures</div>
   <p style="margin-top:0">Fixtures sync into the shared calendar, so everyone on the list sees them. A device with the lights connector keeps them up to date.</p>
@@ -383,7 +396,7 @@
 </dialog>
 
 <script type="module">
-import { firebaseConfig } from "../firebase-config.js?v=15";
+import { firebaseConfig } from "../firebase-config.js?v=16";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = (id) => document.getElementById(id);
@@ -503,6 +516,8 @@ const WHO = ["a", "b", "both", "bday"];
 const ALL_WHO = [...WHO, "football"];
 let teams = []; // [{ id, name }] shared on the list record
 const REPEAT = [["none", "Doesn't repeat"], ["weekly", "Every week"], ["yearly", "Every year"]];
+const REMIND = [["none", "None"], ["at", "On the day"], ["1h", "1 hour before"], ["1d", "Day before"], ["2d", "2 days before"], ["1w", "A week before"]];
+const remindLabel = (r) => (REMIND.find(([v]) => v === r) || [])[1];
 const whoName = (w) => (w === "football" ? "Football" : w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Beth"));
 const whoOf = (ev) => (ALL_WHO.includes(ev.who) ? ev.who : "both");
 const icon = (ev) => (whoOf(ev) === "bday" ? "🎂 " : whoOf(ev) === "football" ? "⚽ " : "");
@@ -562,6 +577,7 @@ function eventRow(ev, day, withDate) {
   else if (withDate) bits.unshift(timeText(ev));
   if (ev.repeat === "weekly") bits.push("every week");
   if (ev.repeat === "yearly") bits.push("every year");
+  if (ev.remind && ev.remind !== "none") bits.push("🔔 " + remindLabel(ev.remind).toLowerCase());
   what.append(el("small", null, bits.join(" · ")));
   li.append(what);
   if (synced) return li; // fixtures come from the feed, so they aren't edited here
@@ -627,12 +643,14 @@ function pickRow(box, options, current, onPick) {
 function renderPickers() {
   pickRow($("evWho"), WHO.map((w) => [w, (w === "bday" ? "🎂 " : "") + whoName(w), "who-" + w]), editing.who, (v) => { editing.who = v; if (v === "bday") editing.repeat = "yearly"; renderPickers(); });
   pickRow($("evRepeat"), REPEAT, editing.repeat, (v) => { editing.repeat = v; renderPickers(); });
+  pickRow($("evRemind"), REMIND, editing.remind, (v) => { editing.remind = v; renderPickers(); });
   // "Until" is for one-off stretches like annual leave; repeating events are single days.
   $("evEndWrap").style.visibility = editing.repeat === "none" ? "visible" : "hidden";
 }
 function openEvent(ev) {
   if (!listRef) { setTab("list"); return; }
-  editing = ev ? { id: ev.id, who: whoOf(ev), repeat: ev.repeat || "none" } : { id: null, who: storageGet("lastWho") || "both", repeat: "none" };
+  editing = ev ? { id: ev.id, who: whoOf(ev), repeat: ev.repeat || "none", remind: ev.remind || "none" }
+    : { id: null, who: storageGet("lastWho") || "both", repeat: "none", remind: storageGet("lastRemind") || "1d" };
   if (!WHO.includes(editing.who)) editing.who = "both";
   $("evHeading").textContent = ev ? "Edit event" : "Add to calendar";
   $("evName").value = ev?.title || "";
@@ -659,7 +677,8 @@ $("evForm").onsubmit = async (e) => {
   $("evError").hidden = !problem;
   if (problem) return;
   const id = editing.id || newId();
-  const data = { title, date, endDate: end && end > date ? end : "", time: $("evTime").value || "", who: editing.who, repeat: editing.repeat, createdAt: events.find((x) => x.id === id)?.createdAt || Date.now() };
+  storageSet("lastRemind", editing.remind);
+  const data = { remind: editing.remind, title, date, endDate: end && end > date ? end : "", time: $("evTime").value || "", who: editing.who, repeat: editing.repeat, createdAt: events.find((x) => x.id === id)?.createdAt || Date.now() };
   if (editing.who !== "bday") storageSet("lastWho", editing.who);
   $("eventDialog").close();
   await save(() => fsApi.setDoc(listRef, { events: { [id]: data } }, { merge: true }));
@@ -737,6 +756,7 @@ async function connectFirebase() {
       events = Object.entries(map).map(([id, v]) => ({ id, ...v })).filter((e) => typeof e.title === "string" && typeof e.date === "string");
       if (m.calendarNames) names = { a: m.calendarNames.a || "Dean", b: m.calendarNames.b || "Beth" };
       if (m.calendarColours && typeof m.calendarColours === "object") { colours = m.calendarColours; applyColours(); }
+      if ("lightsShown" in m) { shownIds = Array.isArray(m.lightsShown) ? m.lightsShown : null; if (lights.length && !choosing) renderLights(); }
       teams = Array.isArray(m.footballTeams) ? m.footballTeams.filter((t) => t && /^\d+$/.test(String(t.id))) : [];
       if ($("settingsDialog").open) renderTeams();
       syncFixtures(false);
@@ -792,8 +812,47 @@ function stateText(l) {
   if (l.on === false) return "Off";
   return "";
 }
-function renderLights() {
+// Which lights appear on the panel (shared on the list record; null = all).
+let shownIds = null, choosing = false, draftShown = null;
+const visible = () => (shownIds ? lights.filter((l) => shownIds.includes(l.id)) : lights);
+function renderChooser() {
   $("lightList").replaceChildren(...lights.map((l) => {
+    const on = draftShown.has(l.id);
+    const li = el("li", on ? "sel" : "");
+    const b = el("button", "lname");
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    const text = el("span", null, l.name);
+    if (l.online === false) text.append(el("small", null, "Offline"));
+    b.append(el("i", null, on ? "✓" : ""), text);
+    b.onclick = () => { on ? draftShown.delete(l.id) : draftShown.add(l.id); renderChooser(); };
+    li.append(b);
+    return li;
+  }));
+  $("lightsChecked").textContent = `${draftShown.size} of ${lights.length} shown`;
+}
+function setChoosing(on) {
+  choosing = on;
+  draftShown = new Set(visible().map((l) => l.id));
+  $("lightsChoose").textContent = on ? "Done" : "Choose lights";
+  $("lightsRefresh").hidden = on;
+  document.querySelector("#lightsBody > .row").hidden = on;
+  $("adjust").hidden = on;
+  if (on) renderChooser(); else { renderLights(); renderAdjust(); }
+}
+$("lightsChoose").onclick = async () => {
+  if (!choosing) return setChoosing(true);
+  const ids = lights.filter((l) => draftShown.has(l.id)).map((l) => l.id);
+  shownIds = ids.length === lights.length ? null : ids;
+  for (const id of [...lightSel]) if (shownIds && !shownIds.includes(id)) lightSel.delete(id);
+  if (listRef && fsApi) save(() => fsApi.setDoc(listRef, { lightsShown: shownIds }, { merge: true }));
+  else storageSet("lightsShown", JSON.stringify(shownIds));
+  setChoosing(false);
+};
+try { const v = JSON.parse(storageGet("lightsShown") || "null"); if (Array.isArray(v)) shownIds = v; } catch {}
+
+function renderLights() {
+  if (choosing) return renderChooser();
+  $("lightList").replaceChildren(...visible().map((l) => {
     const li = el("li", (lightSel.has(l.id) ? "sel" : "") + (l.online === false ? " offline" : ""));
     const name = el("button", "lname");
     name.setAttribute("aria-pressed", lightSel.has(l.id));
@@ -821,7 +880,7 @@ function renderAdjust() {
   const list = chosen(), n = list.length;
   $("adjust").classList.toggle("disabled", n === 0);
   $("adjustLabel").textContent = n === 0 ? "Tap a light's name to change its colour or brightness"
-    : `Colour and brightness for ${n === lights.length ? "all lights" : n === 1 ? list[0].name : n + " lights"}`;
+    : `Colour and brightness for ${n === visible().length ? "all lights" : n === 1 ? list[0].name : n + " lights"}`;
   const avg = n ? Math.round(list.reduce((t, l) => t + (l.brightness || 50), 0) / n) : 50;
   if (document.activeElement !== $("bright")) { $("bright").value = avg; $("brightVal").textContent = avg + "%"; }
   $("sceneBtn").hidden = n !== 1;
@@ -870,8 +929,8 @@ async function change(targets, patch) {
   refreshTimer = setTimeout(loadLights, 6000);
 }
 
-$("allOn").onclick = () => change(lights.filter((l) => l.online !== false), { power: "on" });
-$("allOff").onclick = () => change(lights.filter((l) => l.online !== false), { power: "off" });
+$("allOn").onclick = () => change(visible().filter((l) => l.online !== false), { power: "on" });
+$("allOff").onclick = () => change(visible().filter((l) => l.online !== false), { power: "off" });
 $("bright").oninput = () => { $("brightVal").textContent = $("bright").value + "%"; };
 $("bright").onchange = () => change(chosen(), { brightness: Number($("bright").value) });
 $("colorPick").onchange = () => change(chosen(), { color: $("colorPick").value });
@@ -1023,9 +1082,69 @@ $("teamForm").onsubmit = async (e) => {
   $("teamAdd").disabled = false; $("teamAdd").textContent = "Add team";
 };
 
+// =====================================================================
+// Reminders — this device signs up for notifications; the home connector
+// sends them (it checks the shared calendar every 15 minutes).
+// =====================================================================
+const VAPID_PUBLIC = "BPjH7F5IlMpqZ5zU6oH2tdHPMZoXIcfWN5WVaf8glreEJC82yv1XEvWaczt_0UcsWdMD3CLPfWJq44fEG5Jfcnw";
+const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("../sw.js", { scope: "../" }).catch(() => {});
+const b64uBytes = (s) => { const t = s.replace(/-/g, "+").replace(/_/g, "/"); return Uint8Array.from(atob(t + "=".repeat((4 - (t.length % 4)) % 4)), (c) => c.charCodeAt(0)); };
+let pushWho = storageGet("pushWho") || "a";
+const pushId = () => storageGet("pushSubId");
+const pushMsg = (t) => { $("pushStatus").textContent = t || ""; };
+function renderReminders() {
+  if (!pushSupported) {
+    $("pushIntro").textContent = "This browser can't show reminders. On an iPhone, add the shopping list to your Home Screen first and open it from there.";
+    ["pushWho", "pushOn", "pushTest", "pushOff"].forEach((id) => ($(id).hidden = true));
+    return;
+  }
+  const on = !!pushId() && Notification.permission === "granted";
+  pickRow($("pushWho"), [["a", names.a + "'s reminders"], ["b", names.b + "'s reminders"], ["all", "Everyone's"]].map(([v, l]) => [v, l]), pushWho, async (v) => {
+    pushWho = v; storageSet("pushWho", v); renderReminders();
+    if (pushId() && listRef) await save(() => fsApi.setDoc(listRef, { pushSubs: { [pushId()]: { who: v } } }, { merge: true }));
+  });
+  $("pushOn").hidden = on;
+  $("pushTest").hidden = !on;
+  $("pushOff").hidden = !on;
+  if (!$("pushStatus").textContent) pushMsg(on ? "Reminders are on for this device. Shared events and birthdays go to everyone." : "");
+}
+$("pushOn").onclick = async () => {
+  if (!listRef || !fsApi) return pushMsg("Connect this device to your shopping list first.");
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return pushMsg("Notifications are blocked for this app. Allow them in your phone's settings for this site, then try again.");
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(VAPID_PUBLIC) }));
+    const j = sub.toJSON();
+    const id = pushId() || "s" + newId().slice(0, 16);
+    const ok = await save(() => fsApi.setDoc(listRef, { pushSubs: { [id]: { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, who: pushWho, createdAt: Date.now() } } }, { merge: true }));
+    if (!ok) return pushMsg("Couldn't save the sign-up. Check your connection and try again.");
+    storageSet("pushSubId", id);
+    pushMsg("Reminders are on for this device.");
+    renderReminders();
+  } catch (e) { pushMsg("Couldn't turn on reminders: " + (e?.message || e)); }
+};
+$("pushOff").onclick = async () => {
+  const id = pushId();
+  try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); await sub?.unsubscribe(); } catch {}
+  if (id && listRef) await save(() => fsApi.updateDoc(listRef, { ["pushSubs." + id]: fsApi.deleteField() }));
+  storageDel("pushSubId");
+  pushMsg("Reminders are off for this device.");
+  renderReminders();
+};
+$("pushTest").onclick = async () => {
+  if (!apiBase()) return pushMsg("Tests are sent through the lights connector, which isn't set up on this device. Reminders will still arrive.");
+  pushMsg("Sending…");
+  try { await api("test_push", { id: pushId() }); pushMsg("Sent. It should arrive in a few seconds."); }
+  catch (e) { pushMsg(e.message); }
+};
+
 // ---------- Settings ----------
 $("settingsBtn").onclick = () => {
   renderTeams();
+  pushMsg("");
+  renderReminders();
   $("setListCode").textContent = listCode || "Not connected yet";
   $("setForgetList").hidden = !listCode;
   $("setLights").textContent = apiBase() ? "Connected on this device" : "Not set up on this device";
