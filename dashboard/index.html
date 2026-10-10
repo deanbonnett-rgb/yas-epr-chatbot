@@ -17,7 +17,7 @@
     --bg: #f3f5f1; --card: #ffffff; --text: #1b241e; --muted: #64706a; --line: #dfe5df;
     --accent: #2f7d4f; --on-accent: #ffffff; --accent-soft: #e2f0e7; --warn: #9a5b00; --danger: #b3392c;
     --shadow: rgba(16, 32, 22, .16);
-    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #a3416c; --p2-soft: #f6e4ec;
+    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #a3416c; --p2-soft: #f6e4ec; --p3: #a8640a; --p3-soft: #fbefd9;
     --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
     --body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
@@ -27,7 +27,7 @@
       --bg: #111613; --card: #1a201c; --text: #e6ece8; --muted: #95a29a; --line: #2a332d;
       --accent: #5cc189; --on-accent: #0c1a11; --accent-soft: #1d3326; --warn: #e0a24a; --danger: #ef7d6f;
       --shadow: rgba(0, 0, 0, .5);
-      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #ea8db6; --p2-soft: #3a2230;
+      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #ea8db6; --p2-soft: #3a2230; --p3: #f0b75a; --p3-soft: #3a2e18;
     }
   }
 
@@ -178,6 +178,7 @@
   .who-a { --who: var(--p1); --who-soft: var(--p1-soft); }
   .who-b { --who: var(--p2); --who-soft: var(--p2-soft); }
   .who-both { --who: var(--accent); --who-soft: var(--accent-soft); }
+  .who-bday { --who: var(--p3); --who-soft: var(--p3-soft); }
   .dots i, .legend i { background: var(--who); }
   .lbl { background: var(--who-soft); color: var(--who); }
   .day-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
@@ -189,7 +190,7 @@
   .ev.tappable { cursor: pointer; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .row2 > div { min-width: 0; }
-  .shop-pick .shop-chip.who-a.active, .shop-pick .shop-chip.who-b.active, .shop-pick .shop-chip.who-both.active { background: var(--who); border-color: var(--who); color: var(--card); }
+  .shop-pick .shop-chip.who-a.active, .shop-pick .shop-chip.who-b.active, .shop-pick .shop-chip.who-both.active, .shop-pick .shop-chip.who-bday.active { background: var(--who); border-color: var(--who); color: var(--card); }
   #evDelete { margin-top: 10px; }
 
   @media (prefers-reduced-motion: reduce) { .lswitch span { transition: none; } }
@@ -313,9 +314,11 @@
     <input id="evName" placeholder="e.g. Dentist, Bin day, Mum's birthday" enterkeyhint="done">
     <div class="row2">
       <div><label class="field-label" for="evDate">Day</label><input type="date" id="evDate"></div>
-      <div><label class="field-label" for="evTime">Time (optional)</label><input type="time" id="evTime"></div>
+      <div id="evEndWrap"><label class="field-label" for="evEnd">Until (optional)</label><input type="date" id="evEnd"></div>
     </div>
-    <div class="field-label">Who's it for</div>
+    <label class="field-label" for="evTime">Time (optional)</label>
+    <input type="time" id="evTime">
+    <div class="field-label">Who's it for (or Birthday)</div>
     <div class="shop-pick" id="evWho"></div>
     <div class="field-label">Repeats</div>
     <div class="shop-pick" id="evRepeat"></div>
@@ -451,9 +454,9 @@ let fsApi = null, listRef = null, events = [], loaded = false;
 let names = { a: "Dean", b: "Partner" };
 let view = new Date(); view.setDate(1);
 let selected = todayISO();
-const WHO = ["a", "b", "both"];
+const WHO = ["a", "b", "both", "bday"];
 const REPEAT = [["none", "Doesn't repeat"], ["weekly", "Every week"], ["yearly", "Every year"]];
-const whoName = (w) => (w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Partner"));
+const whoName = (w) => (w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Partner"));
 const whoOf = (ev) => (WHO.includes(ev.who) ? ev.who : "both");
 const newId = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
@@ -461,8 +464,12 @@ function occursOn(ev, day) {
   if (!ev.date || day < ev.date) return false;
   if (ev.repeat === "weekly") return Math.round((parse(day) - parse(ev.date)) / 864e5) % 7 === 0;
   if (ev.repeat === "yearly") return day.slice(5) === ev.date.slice(5);
-  return day === ev.date;
+  return day <= endOf(ev);
 }
+// Last day of a one-off event (the start day unless it has a later "until" date).
+const endOf = (ev) => (ev.repeat !== "weekly" && ev.repeat !== "yearly" && typeof ev.endDate === "string" && ev.endDate > ev.date ? ev.endDate : ev.date);
+const isSpan = (ev) => endOf(ev) !== ev.date;
+const rangeText = (ev) => shortDate(ev.date) + " – " + shortDate(endOf(ev));
 const eventsOn = (day) => events.filter((e) => occursOn(e, day)).sort((a, b) => (a.time || "").localeCompare(b.time || "") || a.title.localeCompare(b.title));
 const timeText = (ev) => ev.time || "All day";
 
@@ -489,7 +496,7 @@ function renderGrid() {
     const dots = el("span", "dots");
     list.slice(0, 4).forEach((e) => dots.append(el("i", "who-" + whoOf(e))));
     const lbls = el("span", "lbls");
-    list.slice(0, 2).forEach((e) => lbls.append(el("span", "lbl who-" + whoOf(e), (e.time ? e.time + " " : "") + e.title)));
+    list.slice(0, 2).forEach((e) => lbls.append(el("span", "lbl who-" + whoOf(e), (whoOf(e) === "bday" ? "🎂 " : e.time ? e.time + " " : "") + e.title)));
     if (list.length > 2) lbls.append(el("span", "more", `+${list.length - 2} more`));
     b.append(dots, lbls);
     b.onclick = () => { selected = day; if (d.getMonth() !== view.getMonth()) view = new Date(d.getFullYear(), d.getMonth(), 1); renderCal(); };
@@ -500,9 +507,10 @@ function renderGrid() {
 function eventRow(ev, day, withDate) {
   const li = el("li", "ev tappable who-" + whoOf(ev));
   li.append(el("span", "bar"), el("span", "when", withDate ? shortDate(day).replace(/ \w+$/, "") : timeText(ev)));
-  const what = el("span", "what", ev.title);
+  const what = el("span", "what", (whoOf(ev) === "bday" ? "🎂 " : "") + ev.title);
   const bits = [whoName(whoOf(ev))];
-  if (withDate) bits.unshift(timeText(ev));
+  if (isSpan(ev)) bits.unshift(rangeText(ev));
+  else if (withDate) bits.unshift(timeText(ev));
   if (ev.repeat === "weekly") bits.push("every week");
   if (ev.repeat === "yearly") bits.push("every year");
   what.append(el("small", null, bits.join(" · ")));
@@ -518,10 +526,15 @@ function renderDay() {
   const list = eventsOn(selected);
   $("dayEvents").replaceChildren(...list.map((e) => eventRow(e, selected, false)));
   $("dayEmpty").hidden = !loaded || list.length > 0;
-  const up = [];
+  // Coming up: each event once, on its first upcoming day (a week of leave shows as one line).
+  const up = [], seen = new Set(eventsOn(t).filter(isSpan).map((e) => e.id));
   for (let i = 1; i <= 14 && up.length < 8; i++) {
     const day = addDays(t, i);
-    eventsOn(day).forEach((e) => up.length < 8 && up.push([e, day]));
+    eventsOn(day).forEach((e) => {
+      if (up.length >= 8 || (isSpan(e) && seen.has(e.id))) return;
+      seen.add(e.id);
+      up.push([e, day]);
+    });
   }
   $("upcoming").replaceChildren(...up.map(([e, day]) => eventRow(e, day, true)));
   $("upcomingEmpty").hidden = !loaded || up.length > 0;
@@ -534,8 +547,8 @@ function renderToday() {
   $("todayList").replaceChildren(...list.map((e) => {
     const li = el("li", "ev who-" + whoOf(e));
     li.append(el("span", "bar"), el("span", "when", timeText(e)));
-    const w = el("span", "what", e.title);
-    w.append(el("small", null, whoName(whoOf(e))));
+    const w = el("span", "what", (whoOf(e) === "bday" ? "🎂 " : "") + e.title);
+    w.append(el("small", null, (isSpan(e) ? "Until " + shortDate(endOf(e)) + " · " : "") + whoName(whoOf(e))));
     li.append(w);
     return li;
   }));
@@ -561,8 +574,10 @@ function pickRow(box, options, current, onPick) {
   }));
 }
 function renderPickers() {
-  pickRow($("evWho"), WHO.map((w) => [w, whoName(w), "who-" + w]), editing.who, (v) => { editing.who = v; renderPickers(); });
+  pickRow($("evWho"), WHO.map((w) => [w, (w === "bday" ? "🎂 " : "") + whoName(w), "who-" + w]), editing.who, (v) => { editing.who = v; if (v === "bday") editing.repeat = "yearly"; renderPickers(); });
   pickRow($("evRepeat"), REPEAT, editing.repeat, (v) => { editing.repeat = v; renderPickers(); });
+  // "Until" is for one-off stretches like annual leave; repeating events are single days.
+  $("evEndWrap").style.visibility = editing.repeat === "none" ? "visible" : "hidden";
 }
 function openEvent(ev) {
   if (!listRef) { setTab("list"); return; }
@@ -572,6 +587,7 @@ function openEvent(ev) {
   $("evName").value = ev?.title || "";
   $("evDate").value = ev?.date || selected;
   $("evTime").value = ev?.time || "";
+  $("evEnd").value = ev && isSpan(ev) ? endOf(ev) : "";
   $("evError").hidden = true;
   $("evDelete").hidden = !ev;
   $("evDelete").textContent = "Delete";
@@ -585,13 +601,15 @@ $("evForm").onsubmit = async (e) => {
   e.preventDefault();
   const title = $("evName").value.trim();
   const date = $("evDate").value;
-  const problem = !title ? "Add what it is, like Dentist." : !date ? "Pick a day." : null;
+  const end = editing.repeat === "none" ? $("evEnd").value : "";
+  const problem = !title ? "Add what it is, like Dentist." : !date ? "Pick a day."
+    : end && end < date ? "The Until date is before the start day." : null;
   $("evError").textContent = problem || "";
   $("evError").hidden = !problem;
   if (problem) return;
   const id = editing.id || newId();
-  const data = { title, date, time: $("evTime").value || "", who: editing.who, repeat: editing.repeat, createdAt: events.find((x) => x.id === id)?.createdAt || Date.now() };
-  storageSet("lastWho", editing.who);
+  const data = { title, date, endDate: end && end > date ? end : "", time: $("evTime").value || "", who: editing.who, repeat: editing.repeat, createdAt: events.find((x) => x.id === id)?.createdAt || Date.now() };
+  if (editing.who !== "bday") storageSet("lastWho", editing.who);
   $("eventDialog").close();
   await save(() => fsApi.setDoc(listRef, { events: { [id]: data } }, { merge: true }));
   goToDay(date);
