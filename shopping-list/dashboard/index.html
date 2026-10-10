@@ -17,7 +17,7 @@
     --bg: #f3f5f1; --card: #ffffff; --text: #1b241e; --muted: #64706a; --line: #dfe5df;
     --accent: #2f7d4f; --on-accent: #ffffff; --accent-soft: #e2f0e7; --warn: #9a5b00; --danger: #b3392c;
     --shadow: rgba(16, 32, 22, .16);
-    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #a3416c; --p2-soft: #f6e4ec; --p3: #a8640a; --p3-soft: #fbefd9;
+    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #a3416c; --p2-soft: #f6e4ec; --p3: #a8640a; --p3-soft: #fbefd9; --p4: #c0262d; --p4-soft: #fbe3e4;
     --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
     --body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
@@ -27,7 +27,7 @@
       --bg: #111613; --card: #1a201c; --text: #e6ece8; --muted: #95a29a; --line: #2a332d;
       --accent: #5cc189; --on-accent: #0c1a11; --accent-soft: #1d3326; --warn: #e0a24a; --danger: #ef7d6f;
       --shadow: rgba(0, 0, 0, .5);
-      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #ea8db6; --p2-soft: #3a2230; --p3: #f0b75a; --p3-soft: #3a2e18;
+      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #ea8db6; --p2-soft: #3a2230; --p3: #f0b75a; --p3-soft: #3a2e18; --p4: #f47b80; --p4-soft: #3d1d1f;
     }
   }
 
@@ -181,6 +181,9 @@
   .who-b { --who: var(--p2); --who-soft: var(--p2-soft); }
   .who-both { --who: var(--accent); --who-soft: var(--accent-soft); }
   .who-bday { --who: var(--p3); --who-soft: var(--p3-soft); }
+  .who-football { --who: var(--p4); --who-soft: var(--p4-soft); }
+  .team-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .team-row:first-child { border-top: 0; }
   .dots i, .legend i { background: var(--who); }
   .lbl { background: var(--who-soft); color: var(--who); }
   .day-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
@@ -352,11 +355,21 @@
   <p id="setLights" style="margin-top:0"></p>
   <button class="link-btn danger" id="setForgetLights">Forget the lights connector on this device</button>
   <hr>
+  <div class="field-label">Football fixtures</div>
+  <p style="margin-top:0">Fixtures sync into the shared calendar, so everyone on the list sees them. A device with the lights connector keeps them up to date.</p>
+  <div id="teamList"></div>
+  <form class="setup-form" id="teamForm" style="margin-top:8px">
+    <label class="field-label" for="teamInput" style="margin:0">Add a team (FotMob team link or number)</label>
+    <input class="text-input" id="teamInput" placeholder="e.g. 10260 for Manchester United" autocomplete="off" spellcheck="false">
+    <p class="field-error" id="teamError" hidden></p>
+    <button class="btn" type="submit" id="teamAdd">Add team</button>
+  </form>
+  <hr>
   <div class="row"><button class="btn secondary" id="settingsClose">Close</button></div>
 </dialog>
 
 <script type="module">
-import { firebaseConfig } from "../firebase-config.js?v=11";
+import { firebaseConfig } from "../firebase-config.js?v=12";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = (id) => document.getElementById(id);
@@ -463,9 +476,12 @@ let names = { a: "Dean", b: "Partner" };
 let view = new Date(); view.setDate(1);
 let selected = todayISO();
 const WHO = ["a", "b", "both", "bday"];
+const ALL_WHO = [...WHO, "football"];
+let teams = []; // [{ id, name }] shared on the list record
 const REPEAT = [["none", "Doesn't repeat"], ["weekly", "Every week"], ["yearly", "Every year"]];
-const whoName = (w) => (w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Partner"));
-const whoOf = (ev) => (WHO.includes(ev.who) ? ev.who : "both");
+const whoName = (w) => (w === "football" ? "Football" : w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Partner"));
+const whoOf = (ev) => (ALL_WHO.includes(ev.who) ? ev.who : "both");
+const icon = (ev) => (whoOf(ev) === "bday" ? "🎂 " : whoOf(ev) === "football" ? "⚽ " : "");
 const newId = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 function occursOn(ev, day) {
@@ -484,7 +500,7 @@ const timeText = (ev) => ev.time || "All day";
 function goToDay(day) { selected = day; view = parse(day); view.setDate(1); renderCal(); }
 
 function renderLegend() {
-  $("calLegend").replaceChildren(...WHO.map((w) => { const s = el("span", "who-" + w); s.append(el("i"), whoName(w)); return s; }));
+  $("calLegend").replaceChildren(...(teams.length ? ALL_WHO : WHO).map((w) => { const s = el("span", "who-" + w); s.append(el("i"), whoName(w)); return s; }));
 }
 function renderGrid() {
   $("calMonth").textContent = view.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
@@ -504,7 +520,7 @@ function renderGrid() {
     const dots = el("span", "dots");
     list.slice(0, 4).forEach((e) => dots.append(el("i", "who-" + whoOf(e))));
     const lbls = el("span", "lbls");
-    list.slice(0, 2).forEach((e) => lbls.append(el("span", "lbl who-" + whoOf(e), (whoOf(e) === "bday" ? "🎂 " : e.time ? e.time + " " : "") + e.title)));
+    list.slice(0, 2).forEach((e) => lbls.append(el("span", "lbl who-" + whoOf(e), (whoOf(e) === "bday" ? "🎂 " : icon(e) + (e.time ? e.time + " " : "")) + e.title)));
     if (list.length > 2) lbls.append(el("span", "more", `+${list.length - 2} more`));
     b.append(dots, lbls);
     b.onclick = () => { selected = day; if (d.getMonth() !== view.getMonth()) view = new Date(d.getFullYear(), d.getMonth(), 1); renderCal(); };
@@ -513,16 +529,18 @@ function renderGrid() {
   $("calGrid").replaceChildren(...cells);
 }
 function eventRow(ev, day, withDate) {
-  const li = el("li", "ev tappable who-" + whoOf(ev));
+  const synced = !!ev.source;
+  const li = el("li", "ev who-" + whoOf(ev) + (synced ? "" : " tappable"));
   li.append(el("span", "bar"), el("span", "when", withDate ? shortDate(day).replace(/ \w+$/, "") : timeText(ev)));
-  const what = el("span", "what", (whoOf(ev) === "bday" ? "🎂 " : "") + ev.title);
-  const bits = [whoName(whoOf(ev))];
+  const what = el("span", "what", icon(ev) + ev.title);
+  const bits = [synced && ev.location ? ev.location : whoName(whoOf(ev))];
   if (isSpan(ev)) bits.unshift(rangeText(ev));
   else if (withDate) bits.unshift(timeText(ev));
   if (ev.repeat === "weekly") bits.push("every week");
   if (ev.repeat === "yearly") bits.push("every year");
   what.append(el("small", null, bits.join(" · ")));
   li.append(what);
+  if (synced) return li; // fixtures come from the feed, so they aren't edited here
   li.tabIndex = 0;
   li.onclick = () => openEvent(ev);
   li.onkeydown = (e) => { if (e.key === "Enter") openEvent(ev); };
@@ -555,7 +573,7 @@ function renderToday() {
   $("todayList").replaceChildren(...list.map((e) => {
     const li = el("li", "ev who-" + whoOf(e));
     li.append(el("span", "bar"), el("span", "when", timeText(e)));
-    const w = el("span", "what", (whoOf(e) === "bday" ? "🎂 " : "") + e.title);
+    const w = el("span", "what", icon(e) + e.title);
     w.append(el("small", null, (isSpan(e) ? "Until " + shortDate(endOf(e)) + " · " : "") + whoName(whoOf(e))));
     li.append(w);
     return li;
@@ -661,6 +679,9 @@ async function connectFirebase() {
       const map = m.events && typeof m.events === "object" ? m.events : {};
       events = Object.entries(map).map(([id, v]) => ({ id, ...v })).filter((e) => typeof e.title === "string" && typeof e.date === "string");
       if (m.calendarNames) names = { a: m.calendarNames.a || "Dean", b: m.calendarNames.b || "Partner" };
+      teams = Array.isArray(m.footballTeams) ? m.footballTeams.filter((t) => t && /^\d+$/.test(String(t.id))) : [];
+      if ($("settingsDialog").open) renderTeams();
+      syncFixtures(false);
       loaded = true;
       $("calStatus").textContent = snap.metadata.fromCache ? "Offline – changes will sync when you're back online" : "Up to date · shared with everyone on the list";
       renderCal();
@@ -853,8 +874,92 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && apiBase() && checkedAt && Date.now() - new Date(checkedAt) > 2 * 60 * 1000) loadLights();
 });
 
+// =====================================================================
+// Football fixtures — fetched through the connector from FotMob's team
+// calendar and written into the shared calendar as read-only events.
+// =====================================================================
+const FX_EVERY = 6 * 60 * 60 * 1000;
+let fxBusy = false;
+const hashId = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
+function fixtureEvent(team, f) {
+  let date, time = "";
+  if (f.start?.allDay) date = f.start.date;
+  else if (f.start?.utc) { const d = new Date(f.start.utc); date = iso(d); time = `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  else if (f.start?.local) { date = f.start.local.slice(0, 10); time = f.start.local.slice(11, 16); }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  return { title: String(f.title).slice(0, 120), date, endDate: "", time, who: "football", repeat: "none", location: f.location ? String(f.location).slice(0, 80) : "", source: "fotmob:" + team.id, createdAt: 0 };
+}
+async function syncFixtures(force) {
+  if (fxBusy || !apiBase() || !listRef || !fsApi) return;
+  if (!force && Date.now() - Number(storageGet("fxSyncedAt") || 0) < FX_EVERY) return;
+  fxBusy = true;
+  const keep = addDays(todayISO(), -14); // leave older results alone
+  const updates = {}, deletes = {};
+  try {
+    for (const team of teams) {
+      const r = await api("fixtures", { team: team.id });
+      const wanted = {};
+      for (const f of r?.events || []) {
+        const ev = fixtureEvent(team, f);
+        if (ev && ev.date >= keep) wanted["fx" + team.id + "_" + hashId(f.uid)] = ev;
+      }
+      for (const [id, ev] of Object.entries(wanted)) {
+        const old = events.find((e) => e.id === id);
+        if (!old || old.title !== ev.title || old.date !== ev.date || old.time !== ev.time || (old.location || "") !== ev.location) updates[id] = ev;
+      }
+      for (const e of events) if (e.source === "fotmob:" + team.id && e.date >= keep && !wanted[e.id]) deletes["events." + e.id] = fsApi.deleteField();
+    }
+    // Fixtures of teams that were removed
+    const ids = new Set(teams.map((t) => "fotmob:" + t.id));
+    for (const e of events) if (e.source && e.source.startsWith("fotmob:") && !ids.has(e.source)) deletes["events." + e.id] = fsApi.deleteField();
+    if (Object.keys(updates).length) await fsApi.setDoc(listRef, { events: updates }, { merge: true });
+    if (Object.keys(deletes).length) await fsApi.updateDoc(listRef, deletes);
+    storageSet("fxSyncedAt", String(Date.now()));
+  } catch (e) {
+    $("calStatus").textContent = "Couldn't update football fixtures: " + e.message;
+  } finally { fxBusy = false; }
+}
+setInterval(() => { if (document.visibilityState === "visible") syncFixtures(false); }, 30 * 60 * 1000);
+
+function renderTeams() {
+  const box = $("teamList");
+  box.replaceChildren(...teams.map((t) => {
+    const row = el("div", "team-row");
+    row.append(el("span", null, "⚽ " + (t.name || "Team " + t.id)));
+    const del = el("button", "link-btn danger", "Remove");
+    twoStep(del, "Tap again to remove", async () => {
+      const next = teams.filter((x) => String(x.id) !== String(t.id));
+      await save(() => fsApi.setDoc(listRef, { footballTeams: next }, { merge: true }));
+      teams = next; renderTeams(); syncFixtures(true);
+    });
+    row.append(del);
+    return row;
+  }));
+  if (!teams.length) box.replaceChildren(el("p", null, "No teams yet."));
+  $("teamForm").hidden = !listRef;
+}
+$("teamForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const err = (t) => { $("teamError").textContent = t || ""; $("teamError").hidden = !t; };
+  const id = ($("teamInput").value.match(/\d{2,}/) || [])[0];
+  if (!id) return err("Paste a FotMob team link (fotmob.com/teams/…) or its number, like 10260.");
+  if (teams.some((t) => String(t.id) === id)) return err("That team is already added.");
+  if (!apiBase()) return err("Connect the lights connector on this device first. It also fetches the fixtures.");
+  $("teamAdd").disabled = true; $("teamAdd").textContent = "Checking…"; err("");
+  try {
+    const r = await api("fixtures", { team: id });
+    const name = r?.name || "Team " + id;
+    const next = [...teams, { id, name }];
+    await save(() => fsApi.setDoc(listRef, { footballTeams: next }, { merge: true }));
+    teams = next; $("teamInput").value = ""; renderTeams(); renderLegend();
+    await syncFixtures(true);
+  } catch (ex) { err(ex.message); }
+  $("teamAdd").disabled = false; $("teamAdd").textContent = "Add team";
+};
+
 // ---------- Settings ----------
 $("settingsBtn").onclick = () => {
+  renderTeams();
   $("setListCode").textContent = listCode || "Not connected yet";
   $("setForgetList").hidden = !listCode;
   $("setLights").textContent = apiBase() ? "Connected on this device" : "Not set up on this device";
