@@ -17,7 +17,7 @@
     --bg: #f3f5f1; --card: #ffffff; --text: #1b241e; --muted: #64706a; --line: #dfe5df;
     --accent: #2f7d4f; --on-accent: #ffffff; --accent-soft: #e2f0e7; --warn: #9a5b00; --danger: #b3392c;
     --shadow: rgba(16, 32, 22, .16);
-    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #a3416c; --p2-soft: #f6e4ec; --p3: #a8640a; --p3-soft: #fbefd9; --p4: #c0262d; --p4-soft: #fbe3e4;
+    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #1f8fcf; --p2-soft: #e2f2fb; --p3: #a8640a; --p3-soft: #fbefd9; --p4: #c0262d; --p4-soft: #fbe3e4;
     --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
     --body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
@@ -27,7 +27,7 @@
       --bg: #111613; --card: #1a201c; --text: #e6ece8; --muted: #95a29a; --line: #2a332d;
       --accent: #5cc189; --on-accent: #0c1a11; --accent-soft: #1d3326; --warn: #e0a24a; --danger: #ef7d6f;
       --shadow: rgba(0, 0, 0, .5);
-      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #ea8db6; --p2-soft: #3a2230; --p3: #f0b75a; --p3-soft: #3a2e18; --p4: #f47b80; --p4-soft: #3d1d1f;
+      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #7cc8f2; --p2-soft: #1b2f3d; --p3: #f0b75a; --p3-soft: #3a2e18; --p4: #f47b80; --p4-soft: #3d1d1f;
     }
   }
 
@@ -177,15 +177,21 @@
     .dots { display: none; }
     .lbls { display: flex; }
   }
-  .who-a { --who: var(--p1); --who-soft: var(--p1-soft); }
-  .who-b { --who: var(--p2); --who-soft: var(--p2-soft); }
-  .who-both { --who: var(--accent); --who-soft: var(--accent-soft); }
-  .who-bday { --who: var(--p3); --who-soft: var(--p3-soft); }
-  .who-football { --who: var(--p4); --who-soft: var(--p4-soft); }
+  .who-a { --who: var(--c-a, var(--p1)); }
+  .who-b { --who: var(--c-b, var(--p2)); }
+  .who-both { --who: var(--c-both, var(--accent)); }
+  .who-bday { --who: var(--c-bday, var(--p3)); }
+  .who-football { --who: var(--c-football, var(--p4)); }
+  [class*="who-"] { --who-soft: color-mix(in srgb, var(--who) 16%, var(--card)); --who-ink: color-mix(in srgb, var(--who) 82%, var(--text)); }
+  @media (prefers-color-scheme: dark) { [class*="who-"] { --who-ink: color-mix(in srgb, var(--who) 55%, #ffffff); } }
+  .colour-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .colour-row button { width: 30px; height: 30px; border-radius: 50%; background: var(--sw); border: 2px solid transparent; padding: 0; }
+  .colour-row button[aria-pressed="true"] { border-color: var(--text); box-shadow: inset 0 0 0 2px var(--card); }
+  .colour-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; margin: 4px 0 6px; }
   .team-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
   .team-row:first-child { border-top: 0; }
   .dots i, .legend i { background: var(--who); }
-  .lbl { background: var(--who-soft); color: var(--who); }
+  .lbl { background: var(--who-soft); color: var(--who-ink); }
   .day-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
   .day-head .primary { padding: 9px 16px; }
   .ev .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--who); flex: none; }
@@ -332,12 +338,13 @@
 </dialog>
 
 <dialog id="namesDialog">
-  <h2>Names on the calendar</h2>
-  <p>These show on the calendar so you can tell whose plans are whose.</p>
+  <h2>Names and colours</h2>
+  <p>These are shared, so the calendar looks the same on every device.</p>
   <label class="field-label" for="nameA">First person</label>
   <input id="nameA" maxlength="20">
   <label class="field-label" for="nameB">Second person</label>
   <input id="nameB" maxlength="20">
+  <div id="colourPickers"></div>
   <div class="row">
     <button class="btn secondary" id="namesCancel">Cancel</button>
     <button class="btn" id="namesSave">Save</button>
@@ -370,7 +377,7 @@
 </dialog>
 
 <script type="module">
-import { firebaseConfig } from "../firebase-config.js?v=13";
+import { firebaseConfig } from "../firebase-config.js?v=14";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = (id) => document.getElementById(id);
@@ -473,14 +480,24 @@ if ("wakeLock" in navigator) {
 // so it syncs to every device on the list without changing Firebase rules.
 // =====================================================================
 let fsApi = null, listRef = null, events = [], loaded = false;
-let names = { a: "Dean", b: "Partner" };
+let names = { a: "Dean", b: "Beth" };
+let colours = {}; // chosen colour per category, shared on the list record
+const PALETTE = [["#1f3a8a", "Navy"], ["#2f5fae", "Blue"], ["#1f8fcf", "Sky blue"], ["#0f8b8d", "Teal"], ["#2f7d4f", "Green"], ["#7b4fc9", "Purple"],
+  ["#c2417f", "Pink"], ["#c0262d", "Red"], ["#d4600f", "Orange"], ["#a8640a", "Amber"], ["#5f6b66", "Grey"]];
+function applyColours() {
+  for (const k of ["a", "b", "both", "bday", "football"]) {
+    const c = colours[k];
+    if (c && /^#[0-9a-f]{6}$/i.test(c)) document.documentElement.style.setProperty("--c-" + k, c);
+    else document.documentElement.style.removeProperty("--c-" + k);
+  }
+}
 let view = new Date(); view.setDate(1);
 let selected = todayISO();
 const WHO = ["a", "b", "both", "bday"];
 const ALL_WHO = [...WHO, "football"];
 let teams = []; // [{ id, name }] shared on the list record
 const REPEAT = [["none", "Doesn't repeat"], ["weekly", "Every week"], ["yearly", "Every year"]];
-const whoName = (w) => (w === "football" ? "Football" : w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Partner"));
+const whoName = (w) => (w === "football" ? "Football" : w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Beth"));
 const whoOf = (ev) => (ALL_WHO.includes(ev.who) ? ev.who : "both");
 const icon = (ev) => (whoOf(ev) === "bday" ? "🎂 " : whoOf(ev) === "football" ? "⚽ " : "");
 const newId = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2));
@@ -654,13 +671,37 @@ $("evDelete").onclick = async () => {
   await save(() => fsApi.updateDoc(listRef, { ["events." + id]: fsApi.deleteField() }));
 };
 
-$("calNamesBtn").onclick = () => { $("nameA").value = names.a; $("nameB").value = names.b; $("namesDialog").showModal(); };
+let draftColours = {};
+function renderColourPickers() {
+  const box = $("colourPickers");
+  box.replaceChildren(...["a", "b", "both", "bday", "football"].flatMap((k) => {
+    const label = k === "a" ? ($("nameA").value.trim() || "First person") : k === "b" ? ($("nameB").value.trim() || "Second person") : whoName(k);
+    const head = el("div", "colour-head who-" + k);
+    const dot = el("i"); dot.style.cssText = "width:12px;height:12px;border-radius:50%;display:inline-block;background:" + (draftColours[k] || "var(--who)");
+    head.append(dot, label);
+    const row = el("div", "colour-row");
+    row.append(...PALETTE.map(([hex, name]) => {
+      const b = el("button");
+      b.type = "button";
+      b.style.setProperty("--sw", hex);
+      b.title = name;
+      b.setAttribute("aria-label", `${label}: ${name}`);
+      b.setAttribute("aria-pressed", draftColours[k] === hex ? "true" : "false");
+      b.onclick = () => { draftColours[k] = hex; renderColourPickers(); };
+      return b;
+    }));
+    return [head, row];
+  }));
+}
+$("nameA").oninput = $("nameB").oninput = renderColourPickers;
+$("calNamesBtn").onclick = () => { $("nameA").value = names.a; $("nameB").value = names.b; draftColours = { ...colours }; renderColourPickers(); $("namesDialog").showModal(); };
 $("namesCancel").onclick = () => $("namesDialog").close();
 $("namesSave").onclick = async () => {
-  const next = { a: $("nameA").value.trim() || "Dean", b: $("nameB").value.trim() || "Partner" };
+  const next = { a: $("nameA").value.trim() || "Dean", b: $("nameB").value.trim() || "Beth" };
+  colours = { ...draftColours }; applyColours();
   $("namesDialog").close();
   names = next; renderCal();
-  await save(() => fsApi.setDoc(listRef, { calendarNames: next }, { merge: true }));
+  await save(() => fsApi.setDoc(listRef, { calendarNames: next, calendarColours: colours }, { merge: true }));
 };
 $("calPrev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); renderGrid(); };
 $("calNext").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); renderGrid(); };
@@ -679,7 +720,8 @@ async function connectFirebase() {
       const m = snap.data() || {};
       const map = m.events && typeof m.events === "object" ? m.events : {};
       events = Object.entries(map).map(([id, v]) => ({ id, ...v })).filter((e) => typeof e.title === "string" && typeof e.date === "string");
-      if (m.calendarNames) names = { a: m.calendarNames.a || "Dean", b: m.calendarNames.b || "Partner" };
+      if (m.calendarNames) names = { a: m.calendarNames.a || "Dean", b: m.calendarNames.b || "Beth" };
+      if (m.calendarColours && typeof m.calendarColours === "object") { colours = m.calendarColours; applyColours(); }
       teams = Array.isArray(m.footballTeams) ? m.footballTeams.filter((t) => t && /^\d+$/.test(String(t.id))) : [];
       if ($("settingsDialog").open) renderTeams();
       syncFixtures(false);
