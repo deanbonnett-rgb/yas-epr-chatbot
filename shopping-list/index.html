@@ -150,6 +150,11 @@
   <header>
     <h1>🛒 Our Shopping List</h1>
     <div>
+      <a class="icon-btn" id="dashLink" href="../dashboard/#cal" aria-label="Calendar and lights" title="Calendar and lights" style="text-decoration:none;display:inline-block">📅</a>
+      <script>
+        // Inside the dashboard the list is already next to the calendar, so hide the shortcut there.
+        if (window.top !== window) document.getElementById("dashLink").hidden = true;
+      </script>
       <button class="icon-btn" id="historyBtn" aria-label="Past shops">🕘</button>
       <button class="icon-btn" id="settingsBtn" aria-label="Share &amp; settings">⚙︎</button>
     </div>

@@ -388,7 +388,9 @@ document.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => {
   if (b.dataset.go === "cal") goToDay(todayISO());
   setTab(b.dataset.go);
 }));
-setTab(["home", "list", "cal"].includes(storageGet("dashTab")) ? storageGet("dashTab") : "list");
+// A link can open a section directly: …/dashboard/#home, #cal or #list (the shopping app's 📅 button uses #cal).
+const startTab = location.hash.slice(1);
+setTab(["home", "list", "cal"].includes(startTab) ? startTab : ["home", "list", "cal"].includes(storageGet("dashTab")) ? storageGet("dashTab") : "list");
 
 // ---------- Which shared list (same code the shopping list app uses) ----------
 const CODE_CHARS = /^[A-Z0-9]{10,}$/;
