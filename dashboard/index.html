@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Our Home Dashboard</title>
+<meta name="theme-color" content="#2f7d4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../shopping-list/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+  /* Layout: on a landscape tablet, three columns side by side — home (clock, today, lights, charger), the shopping list app, the shared calendar — each scrolling on its own. Narrower screens show one column at a time with tabs along the bottom. */
+  :root {
+    color-scheme: light;
+    --bg: #f3f5f1; --card: #ffffff; --text: #1b241e; --muted: #64706a; --line: #dfe5df;
+    --accent: #2f7d4f; --on-accent: #ffffff; --accent-soft: #e2f0e7; --warn: #9a5b00; --danger: #b3392c;
+    --shadow: rgba(16, 32, 22, .16);
+    --p1: #2f5fae; --p1-soft: #e3ebf8; --p2: #a3416c; --p2-soft: #f6e4ec;
+    --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+    --body: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #111613; --card: #1a201c; --text: #e6ece8; --muted: #95a29a; --line: #2a332d;
+      --accent: #5cc189; --on-accent: #0c1a11; --accent-soft: #1d3326; --warn: #e0a24a; --danger: #ef7d6f;
+      --shadow: rgba(0, 0, 0, .5);
+      --p1: #86aaf0; --p1-soft: #1d2a40; --p2: #ea8db6; --p2-soft: #3a2230;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 17px/1.4 var(--body); padding-top: env(safe-area-inset-top, 0px); }
+  [hidden] { display: none !important; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; border-radius: 10px; background: none; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  h2.col-title { font: 700 22px/1.1 var(--display); margin: 0; }
+  h3 { font: 600 17px/1.2 var(--display); margin: 0; }
+
+  .col-home, .col-cal { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 96px; display: flex; flex-direction: column; gap: 14px; }
+  .col-list { height: calc(100% - 64px - env(safe-area-inset-bottom, 0px)); }
+  .col-list iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+
+  /* Shared bits */
+  ul { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: 14px; border: 1px solid var(--line); overflow: hidden; }
+  ul:empty { display: none; }
+  li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); background: var(--card); }
+  li:first-child { border-top: 0; }
+  .icon-btn { color: var(--muted); padding: 8px; font-size: 22px; line-height: 1; }
+  .link-btn { white-space: nowrap; color: var(--accent); padding: 4px; font-size: 14px; font-weight: 600; }
+  .link-btn.danger { color: var(--danger); }
+  .primary { background: var(--accent); color: var(--on-accent); padding: 0 18px; font-weight: 600; }
+  .btn { background: var(--accent); color: var(--on-accent); padding: 10px 14px; flex: 1; font-weight: 600; }
+  .btn.secondary { background: var(--accent-soft); color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; }
+  .status { font-size: 12px; color: var(--muted); margin: 0; }
+  .empty { text-align: center; color: var(--muted); padding: 14px 8px; background: var(--card); border: 1px dashed var(--line); border-radius: 14px; font-size: 15px; }
+  .section-title { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .shop-chip { flex: none; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 15px; white-space: nowrap; }
+  .shop-chip.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .shop-pick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .field-label { display: block; font-weight: 600; font-size: 14px; margin: 4px 0 8px; }
+  .field-error { color: var(--danger); font-size: 14px; margin: -4px 0 8px; }
+  .text-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); margin-bottom: 8px; }
+
+  dialog { border: 0; border-radius: 16px; padding: 20px; background: var(--card); color: var(--text); width: min(92vw, 440px); max-height: 85vh; }
+  dialog::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog h2 { margin: 0 0 8px; font: 700 20px var(--display); }
+  dialog p { color: var(--muted); font-size: 15px; margin: 6px 0 12px; }
+  dialog input:not([type="checkbox"]):not([type="range"]):not([type="color"]) { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); margin-bottom: 8px; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+
+  /* Bottom tabs (phones and portrait tablets) */
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .tabs button { flex: 1; border-radius: 0; padding: 8px 4px 10px; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .tabs button span { font-size: 20px; line-height: 1; }
+  .tabs button[aria-current="page"] { color: var(--accent); font-weight: 600; }
+  @media (max-width: 899px) {
+    body:not([data-tab="home"]) .col-home,
+    body:not([data-tab="list"]) .col-list,
+    body:not([data-tab="cal"]) .col-cal { display: none; }
+  }
+
+  /* Landscape tablet: three columns */
+  @media (min-width: 900px) {
+    body { overflow: hidden; }
+    .tabs { display: none; }
+    .dash { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1fr) minmax(0, 1.25fr); height: 100%; }
+    .col { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+    .col-home, .col-cal { max-width: none; margin: 0; padding: 20px; }
+    .col-list { height: 100%; overflow: hidden; border-inline: 1px solid var(--line); }
+  }
+
+  /* Home column */
+  .clock { padding: 4px 2px 0; }
+  .clock-time { font: 700 clamp(56px, 7vw, 84px)/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .clock-date { color: var(--muted); font-size: 18px; margin-top: 6px; }
+  .glance { display: flex; flex-wrap: wrap; gap: 8px; }
+  .glance button { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 15px; }
+  .glance b { font-variant-numeric: tabular-nums; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel-head small { color: var(--muted); font-size: 13px; }
+  .panel p { margin: 0; color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+  .pill.ok::before { background: var(--accent); }
+  .today-list { border: 0; background: none; display: flex; flex-direction: column; gap: 6px; border-radius: 0; }
+  .today-list li { border: 0; padding: 0; background: none; gap: 10px; font-size: 16px; }
+  .home-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  /* Lights */
+  .lights-body { display: flex; flex-direction: column; gap: 10px; }
+  .lights { border-radius: 12px; }
+  .lights li { padding: 8px 10px; gap: 8px; }
+  .lname { flex: 1; min-width: 0; text-align: left; padding: 4px 2px; display: flex; align-items: center; gap: 8px; font-size: 15px; line-height: 1.25; }
+  .lname i { width: 20px; height: 20px; flex: none; border-radius: 6px; border: 2px solid var(--muted); display: grid; place-items: center; font-style: normal; font-size: 12px; color: var(--on-accent); }
+  .lights li.sel .lname i { background: var(--accent); border-color: var(--accent); }
+  .lname small { display: block; color: var(--muted); font-size: 12px; }
+  .lname small.bad { color: var(--danger); }
+  .lights li.offline .lname span, .lights li.offline .lswitch { opacity: .55; }
+  .ldot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--c); border: 1px solid var(--line); }
+  .lswitch { flex: none; width: 52px; height: 30px; border-radius: 999px; background: var(--line); position: relative; padding: 0; }
+  .lswitch span { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 3px var(--shadow); transition: transform .15s ease; }
+  .lswitch.is-on { background: var(--accent); }
+  .lswitch.is-on span { transform: translateX(22px); }
+  .lights-meta { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); margin-top: -4px; }
+  .adjust { display: flex; flex-direction: column; gap: 8px; }
+  .adjust-label { font-size: 14px; color: var(--muted); }
+  .adjust.disabled .swatches, .adjust.disabled .bright-row, .adjust.disabled #sceneBtn { opacity: .4; pointer-events: none; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); background: var(--sw); padding: 0; }
+  .swatch.pick { position: relative; overflow: hidden; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .swatch.pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: 0; padding: 0; }
+  .bright-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+  .bright-row input { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .bright-row span { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  #sceneBtn { align-self: flex-start; }
+  .scene-box { display: flex; gap: 8px; flex-wrap: wrap; }
+  .scene-box select { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; color: var(--text); }
+  .scene-box .btn { flex: none; }
+  .setup-form { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Connect-to-list card (shown until this device knows which list to use) */
+  .connect { max-width: 480px; margin: 0 auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .connect h2 { font: 700 22px/1.15 var(--display); margin: 0; }
+  .connect p { margin: 0; color: var(--muted); }
+
+  /* Calendar */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .cal-nav { display: flex; align-items: center; }
+  .cal-nav .icon-btn { font-size: 26px; padding: 4px 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 14px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .dow { text-align: center; font-size: 12px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; padding-bottom: 2px; }
+  .cell { background: var(--card); border: 1px solid var(--line); border-radius: 10px; min-height: 52px; padding: 5px 4px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left; overflow: hidden; }
+  .cell .num { font-size: 14px; font-variant-numeric: tabular-nums; padding-left: 2px; }
+  .cell.out { opacity: .45; }
+  .cell.today .num { background: var(--accent); color: var(--on-accent); border-radius: 999px; align-self: flex-start; padding: 0 7px; font-weight: 600; }
+  .cell.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .dots { display: flex; gap: 3px; padding-left: 2px; flex-wrap: wrap; }
+  .dots i { width: 7px; height: 7px; border-radius: 50%; }
+  .lbls { display: none; flex-direction: column; gap: 2px; }
+  .lbl { font-size: 11.5px; line-height: 1.25; padding: 1px 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .more { font-size: 11px; color: var(--muted); padding-left: 4px; }
+  @media (min-width: 900px) {
+    .cell { min-height: 78px; }
+    .dots { display: none; }
+    .lbls { display: flex; }
+  }
+  .who-a { --who: var(--p1); --who-soft: var(--p1-soft); }
+  .who-b { --who: var(--p2); --who-soft: var(--p2-soft); }
+  .who-both { --who: var(--accent); --who-soft: var(--accent-soft); }
+  .dots i, .legend i { background: var(--who); }
+  .lbl { background: var(--who-soft); color: var(--who); }
+  .day-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .day-head .primary { padding: 9px 16px; }
+  .ev .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--who); flex: none; }
+  .ev .when { width: 64px; flex: none; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .ev .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .ev .what small { display: block; color: var(--muted); font-size: 13px; }
+  .ev.tappable { cursor: pointer; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row2 > div { min-width: 0; }
+  .shop-pick .shop-chip.who-a.active, .shop-pick .shop-chip.who-b.active, .shop-pick .shop-chip.who-both.active { background: var(--who); border-color: var(--who); color: var(--card); }
+  #evDelete { margin-top: 10px; }
+
+  @media (prefers-reduced-motion: reduce) { .lswitch span { transition: none; } }
+</style>
+</head>
+<body data-tab="list">
+
+<div class="dash">
+<section class="col col-home" aria-label="Home">
+  <div class="clock">
+    <div class="clock-time" id="clockTime">--:--</div>
+    <div class="clock-date" id="clockDate"></div>
+  </div>
+  <div class="glance">
+    <button data-go="cal"><b id="glanceTodayN">0</b> on today</button>
+    <button data-go="list"><b id="glanceListN">0</b> on the shopping list</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Today</h3><small id="todayDate"></small></div>
+    <ul class="today-list" id="todayList"></ul>
+    <p id="todayEmpty">Loading the calendar…</p>
+  </div>
+
+  <div class="panel" id="lightsPanel">
+    <div class="panel-head"><h3>Lights</h3><span class="pill" id="lightsPill">Not set up</span></div>
+    <p id="lightsMsg"></p>
+    <form class="setup-form" id="lightsSetup" hidden>
+      <label class="field-label" for="lightsAddr" style="margin:0">Lights connector address</label>
+      <input class="text-input" id="lightsAddr" placeholder="https://govee-home….workers.dev/…/mcp" autocomplete="off" spellcheck="false">
+      <p class="field-error" id="lightsAddrError" hidden></p>
+      <button class="btn" type="submit">Connect lights</button>
+    </form>
+    <button class="btn secondary" id="lightsRetry" hidden>Try again</button>
+    <div class="lights-body" id="lightsBody" hidden>
+      <div class="row"><button class="btn" id="allOn">All on</button><button class="btn secondary" id="allOff">All off</button></div>
+      <ul class="lights" id="lightList"></ul>
+      <div class="lights-meta"><span id="lightsChecked"></span><button class="link-btn" id="lightsRefresh">Refresh</button></div>
+      <div class="adjust disabled" id="adjust">
+        <div class="adjust-label" id="adjustLabel">Tap a light's name to change its colour or brightness</div>
+        <div class="swatches" id="swatches">
+          <button class="swatch" data-c="#ffd8a8" style="--sw:#ffd8a8" aria-label="Set colour to Warm white" title="Warm white"></button>
+          <button class="swatch" data-c="#ffffff" style="--sw:#ffffff" aria-label="Set colour to White" title="White"></button>
+          <button class="swatch" data-c="#ff0000" style="--sw:#ff0000" aria-label="Set colour to Red" title="Red"></button>
+          <button class="swatch" data-c="#ff7a00" style="--sw:#ff7a00" aria-label="Set colour to Orange" title="Orange"></button>
+          <button class="swatch" data-c="#ffd400" style="--sw:#ffd400" aria-label="Set colour to Yellow" title="Yellow"></button>
+          <button class="swatch" data-c="#00c853" style="--sw:#00c853" aria-label="Set colour to Green" title="Green"></button>
+          <button class="swatch" data-c="#00e5ff" style="--sw:#00e5ff" aria-label="Set colour to Cyan" title="Cyan"></button>
+          <button class="swatch" data-c="#2962ff" style="--sw:#2962ff" aria-label="Set colour to Blue" title="Blue"></button>
+          <button class="swatch" data-c="#9b30ff" style="--sw:#9b30ff" aria-label="Set colour to Purple" title="Purple"></button>
+          <button class="swatch" data-c="#ff2d95" style="--sw:#ff2d95" aria-label="Set colour to Pink" title="Pink"></button>
+          <label class="swatch pick" title="Any colour"><input type="color" id="colorPick" value="#ffffff" aria-label="Pick any colour"></label>
+        </div>
+        <div class="bright-row"><label for="bright">Brightness</label><input type="range" id="bright" min="1" max="100" value="50"><span id="brightVal">50%</span></div>
+        <button class="link-btn" id="sceneBtn" hidden>Scenes…</button>
+        <div class="scene-box" id="sceneBox" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Car charger</h3><span class="pill">App only</span></div>
+    <p>Project EV doesn't let other apps control its chargers yet, so start, stop and schedule charging in the Project EV app.</p>
+  </div>
+
+  <div class="home-foot">
+    <button class="link-btn" id="awakeBtn" hidden>Keep screen on: Off</button>
+    <button class="link-btn" id="settingsBtn">Dashboard settings</button>
+  </div>
+</section>
+
+<section class="col col-list" aria-label="Shopping list">
+  <div class="connect" id="connectCard" hidden>
+    <h2>Connect to your shopping list</h2>
+    <p>On a phone that already has the list, open the shopping list app, tap ⚙︎ and then <b>Share link</b>. Send that link to this device and open it, or paste it below.</p>
+    <form id="connectForm" class="setup-form">
+      <label class="field-label" for="connectInput">Share link or list code</label>
+      <input class="text-input" id="connectInput" placeholder="…/shopping-list/#list=ABCDEFGHJK" autocomplete="off" spellcheck="false">
+      <p class="field-error" id="connectError" hidden></p>
+      <button class="btn" type="submit">Connect</button>
+    </form>
+  </div>
+  <iframe id="listFrame" title="Shopping list" hidden></iframe>
+</section>
+
+<section class="col col-cal" aria-label="Calendar">
+  <div class="cal-head">
+    <h2 class="col-title" id="calMonth">Calendar</h2>
+    <div class="cal-nav">
+      <button class="icon-btn" id="calPrev" aria-label="Previous month">‹</button>
+      <button class="link-btn" id="calToday">Today</button>
+      <button class="icon-btn" id="calNext" aria-label="Next month">›</button>
+      <button class="icon-btn" id="calNamesBtn" aria-label="Names on the calendar">⚙︎</button>
+    </div>
+  </div>
+  <div class="legend" id="calLegend"></div>
+  <div class="month" id="calGrid"></div>
+  <div class="day-head">
+    <h3 id="dayTitle">Today</h3>
+    <button class="primary" id="addEventBtn">+ Add</button>
+  </div>
+  <ul id="dayEvents"></ul>
+  <div class="empty" id="dayEmpty" hidden>Nothing planned. Tap + Add to put something on.</div>
+  <div class="section-title"><span>Coming up</span></div>
+  <ul id="upcoming"></ul>
+  <div class="empty" id="upcomingEmpty" hidden>Nothing in the next two weeks.</div>
+  <p class="status" id="calStatus">Connecting…</p>
+</section>
+</div>
+
+<nav class="tabs" aria-label="Sections">
+  <button data-tab="home"><span>⌂</span>Home</button>
+  <button data-tab="list"><span>🛒</span>List</button>
+  <button data-tab="cal"><span>▦</span>Calendar</button>
+</nav>
+
+<dialog id="eventDialog">
+  <h2 id="evHeading">Add to calendar</h2>
+  <form id="evForm" autocomplete="off">
+    <label class="field-label" for="evName">What</label>
+    <input id="evName" placeholder="e.g. Dentist, Bin day, Mum's birthday" enterkeyhint="done">
+    <div class="row2">
+      <div><label class="field-label" for="evDate">Day</label><input type="date" id="evDate"></div>
+      <div><label class="field-label" for="evTime">Time (optional)</label><input type="time" id="evTime"></div>
+    </div>
+    <div class="field-label">Who's it for</div>
+    <div class="shop-pick" id="evWho"></div>
+    <div class="field-label">Repeats</div>
+    <div class="shop-pick" id="evRepeat"></div>
+    <p class="field-error" id="evError" hidden></p>
+    <div class="row">
+      <button type="button" class="btn secondary" id="evCancel">Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+    <button type="button" class="link-btn danger" id="evDelete" hidden>Delete</button>
+  </form>
+</dialog>
+
+<dialog id="namesDialog">
+  <h2>Names on the calendar</h2>
+  <p>These show on the calendar so you can tell whose plans are whose.</p>
+  <label class="field-label" for="nameA">First person</label>
+  <input id="nameA" maxlength="20">
+  <label class="field-label" for="nameB">Second person</label>
+  <input id="nameB" maxlength="20">
+  <div class="row">
+    <button class="btn secondary" id="namesCancel">Cancel</button>
+    <button class="btn" id="namesSave">Save</button>
+  </div>
+</dialog>
+
+<dialog id="settingsDialog">
+  <h2>Dashboard settings</h2>
+  <p>These settings are kept on this device only.</p>
+  <div class="field-label">Shopping list code</div>
+  <p id="setListCode" style="margin-top:0"></p>
+  <button class="link-btn danger" id="setForgetList">Disconnect this device from the list</button>
+  <hr>
+  <div class="field-label">Lights</div>
+  <p id="setLights" style="margin-top:0"></p>
+  <button class="link-btn danger" id="setForgetLights">Forget the lights connector on this device</button>
+  <hr>
+  <div class="row"><button class="btn secondary" id="settingsClose">Close</button></div>
+</dialog>
+
+<script type="module">
+import { firebaseConfig } from "../shopping-list/firebase-config.js?v=8";
+
+const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+function storageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function storageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function storageDel(k) { try { localStorage.removeItem(k); } catch {} }
+const pad = (n) => String(n).padStart(2, "0");
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const todayISO = () => iso(new Date());
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const longDate = (s) => parse(s).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+const shortDate = (s) => parse(s).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+// ---------- Tabs (narrow screens) ----------
+function setTab(t) {
+  document.body.dataset.tab = t;
+  storageSet("dashTab", t);
+  document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === t ? "page" : "false"));
+}
+document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => { setTab(b.dataset.tab); window.scrollTo(0, 0); }));
+document.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => {
+  if (b.dataset.go === "cal") goToDay(todayISO());
+  setTab(b.dataset.go);
+}));
+setTab(["home", "list", "cal"].includes(storageGet("dashTab")) ? storageGet("dashTab") : "list");
+
+// ---------- Which shared list (same code the shopping list app uses) ----------
+const CODE_CHARS = /^[A-Z0-9]{10,}$/;
+const cleanCode = (s) => (s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+function codeFrom(text) {
+  const t = (text || "").trim();
+  const m = t.match(/list=([A-Za-z0-9]+)/);
+  const c = cleanCode(m ? m[1] : t);
+  return CODE_CHARS.test(c) ? c : null;
+}
+let listCode = codeFrom(new URLSearchParams(location.hash.slice(1)).get("list") || "") || codeFrom(storageGet("listCode") || "");
+if (listCode) storageSet("listCode", listCode);
+if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+
+function showList() {
+  $("connectCard").hidden = !!listCode;
+  $("listFrame").hidden = !listCode;
+  if (listCode && !$("listFrame").src) $("listFrame").src = "../shopping-list/";
+}
+$("connectForm").onsubmit = (e) => {
+  e.preventDefault();
+  const c = codeFrom($("connectInput").value);
+  $("connectError").textContent = c ? "" : "That doesn't look like a share link or list code. The code is 10 letters and numbers.";
+  $("connectError").hidden = !!c;
+  if (!c) return;
+  storageSet("listCode", c);
+  location.reload();
+};
+showList();
+
+// ---------- Clock ----------
+let lastDay = null;
+function tick() {
+  const now = new Date();
+  $("clockTime").textContent = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  $("clockDate").textContent = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  if (lastDay !== todayISO()) { lastDay = todayISO(); renderCal(); }
+}
+
+// ---------- Keep the screen on (wall tablet) ----------
+let lock = null;
+const wantAwake = () => storageGet("keepAwake") === "1";
+function renderAwake() { $("awakeBtn").textContent = "Keep screen on: " + (lock ? "On" : wantAwake() ? "Waiting" : "Off"); }
+async function acquire() {
+  try { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; renderAwake(); }); }
+  catch { lock = null; }
+  renderAwake();
+}
+if ("wakeLock" in navigator) {
+  $("awakeBtn").hidden = false;
+  $("awakeBtn").onclick = async () => {
+    if (wantAwake()) { storageSet("keepAwake", "0"); try { await lock?.release(); } catch {} lock = null; renderAwake(); }
+    else { storageSet("keepAwake", "1"); await acquire(); }
+  };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && wantAwake() && !lock) acquire(); });
+  if (wantAwake()) acquire();
+  renderAwake();
+}
+
+// =====================================================================
+// Calendar — stored on the shared list's own record, as an `events` map,
+// so it syncs to every device on the list without changing Firebase rules.
+// =====================================================================
+let fsApi = null, listRef = null, events = [], loaded = false;
+let names = { a: "Dean", b: "Partner" };
+let view = new Date(); view.setDate(1);
+let selected = todayISO();
+const WHO = ["a", "b", "both"];
+const REPEAT = [["none", "Doesn't repeat"], ["weekly", "Every week"], ["yearly", "Every year"]];
+const whoName = (w) => (w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Partner"));
+const whoOf = (ev) => (WHO.includes(ev.who) ? ev.who : "both");
+const newId = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2));
+
+function occursOn(ev, day) {
+  if (!ev.date || day < ev.date) return false;
+  if (ev.repeat === "weekly") return Math.round((parse(day) - parse(ev.date)) / 864e5) % 7 === 0;
+  if (ev.repeat === "yearly") return day.slice(5) === ev.date.slice(5);
+  return day === ev.date;
+}
+const eventsOn = (day) => events.filter((e) => occursOn(e, day)).sort((a, b) => (a.time || "").localeCompare(b.time || "") || a.title.localeCompare(b.title));
+const timeText = (ev) => ev.time || "All day";
+
+function goToDay(day) { selected = day; view = parse(day); view.setDate(1); renderCal(); }
+
+function renderLegend() {
+  $("calLegend").replaceChildren(...WHO.map((w) => { const s = el("span", "who-" + w); s.append(el("i"), whoName(w)); return s; }));
+}
+function renderGrid() {
+  $("calMonth").textContent = view.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const cells = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => el("div", "dow", d));
+  const first = new Date(view.getFullYear(), view.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7;
+  const inMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+  const weeks = Math.ceil((offset + inMonth) / 7);
+  const today = todayISO();
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(first); d.setDate(1 - offset + i);
+    const day = iso(d);
+    const list = eventsOn(day);
+    const b = el("button", "cell" + (d.getMonth() !== view.getMonth() ? " out" : "") + (day === today ? " today" : "") + (day === selected ? " sel" : ""));
+    b.setAttribute("aria-label", longDate(day) + (list.length ? `, ${list.length} event${list.length === 1 ? "" : "s"}` : ""));
+    b.append(el("span", "num", d.getDate()));
+    const dots = el("span", "dots");
+    list.slice(0, 4).forEach((e) => dots.append(el("i", "who-" + whoOf(e))));
+    const lbls = el("span", "lbls");
+    list.slice(0, 2).forEach((e) => lbls.append(el("span", "lbl who-" + whoOf(e), (e.time ? e.time + " " : "") + e.title)));
+    if (list.length > 2) lbls.append(el("span", "more", `+${list.length - 2} more`));
+    b.append(dots, lbls);
+    b.onclick = () => { selected = day; if (d.getMonth() !== view.getMonth()) view = new Date(d.getFullYear(), d.getMonth(), 1); renderCal(); };
+    cells.push(b);
+  }
+  $("calGrid").replaceChildren(...cells);
+}
+function eventRow(ev, day, withDate) {
+  const li = el("li", "ev tappable who-" + whoOf(ev));
+  li.append(el("span", "bar"), el("span", "when", withDate ? shortDate(day).replace(/ \w+$/, "") : timeText(ev)));
+  const what = el("span", "what", ev.title);
+  const bits = [whoName(whoOf(ev))];
+  if (withDate) bits.unshift(timeText(ev));
+  if (ev.repeat === "weekly") bits.push("every week");
+  if (ev.repeat === "yearly") bits.push("every year");
+  what.append(el("small", null, bits.join(" · ")));
+  li.append(what);
+  li.tabIndex = 0;
+  li.onclick = () => openEvent(ev);
+  li.onkeydown = (e) => { if (e.key === "Enter") openEvent(ev); };
+  return li;
+}
+function renderDay() {
+  const t = todayISO();
+  $("dayTitle").textContent = selected === t ? "Today" : selected === addDays(t, 1) ? "Tomorrow" : longDate(selected);
+  const list = eventsOn(selected);
+  $("dayEvents").replaceChildren(...list.map((e) => eventRow(e, selected, false)));
+  $("dayEmpty").hidden = !loaded || list.length > 0;
+  const up = [];
+  for (let i = 1; i <= 14 && up.length < 8; i++) {
+    const day = addDays(t, i);
+    eventsOn(day).forEach((e) => up.length < 8 && up.push([e, day]));
+  }
+  $("upcoming").replaceChildren(...up.map(([e, day]) => eventRow(e, day, true)));
+  $("upcomingEmpty").hidden = !loaded || up.length > 0;
+}
+function renderToday() {
+  const t = todayISO();
+  const list = eventsOn(t);
+  $("todayDate").textContent = shortDate(t);
+  $("glanceTodayN").textContent = list.length;
+  $("todayList").replaceChildren(...list.map((e) => {
+    const li = el("li", "ev who-" + whoOf(e));
+    li.append(el("span", "bar"), el("span", "when", timeText(e)));
+    const w = el("span", "what", e.title);
+    w.append(el("small", null, whoName(whoOf(e))));
+    li.append(w);
+    return li;
+  }));
+  $("todayEmpty").hidden = loaded && list.length > 0;
+  $("todayEmpty").textContent = !listCode ? "Connect this device to your list to see the calendar."
+    : loaded ? "Nothing on the calendar today." : "Loading the calendar…";
+}
+function renderCal() { renderLegend(); renderGrid(); renderDay(); renderToday(); }
+
+async function save(fn) {
+  if (!fsApi || !listRef) { $("calStatus").textContent = "Connect this device to your list first."; return false; }
+  try { await fn(); return true; }
+  catch (e) { $("calStatus").textContent = "Couldn't save that: " + (e?.message || "check your connection") + "."; return false; }
+}
+
+let editing = null;
+function pickRow(box, options, current, onPick) {
+  box.replaceChildren(...options.map(([value, label, cls]) => {
+    const b = el("button", "shop-chip" + (cls ? " " + cls : "") + (value === current ? " active" : ""), label);
+    b.type = "button";
+    b.onclick = () => onPick(value);
+    return b;
+  }));
+}
+function renderPickers() {
+  pickRow($("evWho"), WHO.map((w) => [w, whoName(w), "who-" + w]), editing.who, (v) => { editing.who = v; renderPickers(); });
+  pickRow($("evRepeat"), REPEAT, editing.repeat, (v) => { editing.repeat = v; renderPickers(); });
+}
+function openEvent(ev) {
+  if (!listRef) { setTab("list"); return; }
+  editing = ev ? { id: ev.id, who: whoOf(ev), repeat: ev.repeat || "none" } : { id: null, who: storageGet("lastWho") || "both", repeat: "none" };
+  if (!WHO.includes(editing.who)) editing.who = "both";
+  $("evHeading").textContent = ev ? "Edit event" : "Add to calendar";
+  $("evName").value = ev?.title || "";
+  $("evDate").value = ev?.date || selected;
+  $("evTime").value = ev?.time || "";
+  $("evError").hidden = true;
+  $("evDelete").hidden = !ev;
+  $("evDelete").textContent = "Delete";
+  renderPickers();
+  $("eventDialog").showModal();
+  if (!ev) $("evName").focus();
+}
+$("addEventBtn").onclick = () => openEvent(null);
+$("evCancel").onclick = () => $("eventDialog").close();
+$("evForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const title = $("evName").value.trim();
+  const date = $("evDate").value;
+  const problem = !title ? "Add what it is, like Dentist." : !date ? "Pick a day." : null;
+  $("evError").textContent = problem || "";
+  $("evError").hidden = !problem;
+  if (problem) return;
+  const id = editing.id || newId();
+  const data = { title, date, time: $("evTime").value || "", who: editing.who, repeat: editing.repeat, createdAt: events.find((x) => x.id === id)?.createdAt || Date.now() };
+  storageSet("lastWho", editing.who);
+  $("eventDialog").close();
+  await save(() => fsApi.setDoc(listRef, { events: { [id]: data } }, { merge: true }));
+  goToDay(date);
+};
+let delTimer = null;
+$("evDelete").onclick = async () => {
+  if (!delTimer) {
+    $("evDelete").textContent = "Tap again to delete";
+    delTimer = setTimeout(() => { delTimer = null; $("evDelete").textContent = "Delete"; }, 3000);
+    return;
+  }
+  clearTimeout(delTimer); delTimer = null;
+  const id = editing.id;
+  $("eventDialog").close();
+  await save(() => fsApi.updateDoc(listRef, { ["events." + id]: fsApi.deleteField() }));
+};
+
+$("calNamesBtn").onclick = () => { $("nameA").value = names.a; $("nameB").value = names.b; $("namesDialog").showModal(); };
+$("namesCancel").onclick = () => $("namesDialog").close();
+$("namesSave").onclick = async () => {
+  const next = { a: $("nameA").value.trim() || "Dean", b: $("nameB").value.trim() || "Partner" };
+  $("namesDialog").close();
+  names = next; renderCal();
+  await save(() => fsApi.setDoc(listRef, { calendarNames: next }, { merge: true }));
+};
+$("calPrev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); renderGrid(); };
+$("calNext").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); renderGrid(); };
+$("calToday").onclick = () => goToDay(todayISO());
+
+async function connectFirebase() {
+  if (!listCode) { loaded = true; $("calStatus").textContent = "Connect this device to your shopping list to share the calendar."; renderCal(); return; }
+  try {
+    const { initializeApp } = await import(`${FIREBASE}/firebase-app.js`);
+    const fs = await import(`${FIREBASE}/firebase-firestore.js`);
+    const app = initializeApp(firebaseConfig, "dashboard");
+    const db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+    fsApi = fs;
+    listRef = fs.doc(db, "lists", listCode);
+    fs.onSnapshot(listRef, { includeMetadataChanges: true }, (snap) => {
+      const m = snap.data() || {};
+      const map = m.events && typeof m.events === "object" ? m.events : {};
+      events = Object.entries(map).map(([id, v]) => ({ id, ...v })).filter((e) => typeof e.title === "string" && typeof e.date === "string");
+      if (m.calendarNames) names = { a: m.calendarNames.a || "Dean", b: m.calendarNames.b || "Partner" };
+      loaded = true;
+      $("calStatus").textContent = snap.metadata.fromCache ? "Offline – changes will sync when you're back online" : "Up to date · shared with everyone on the list";
+      renderCal();
+    }, (err) => { $("calStatus").textContent = "Sync problem: " + err.message; });
+    fs.onSnapshot(fs.collection(listRef, "items"), (snap) => {
+      $("glanceListN").textContent = snap.docs.filter((d) => !d.data().got).length;
+    }, () => {});
+  } catch (e) {
+    loaded = true;
+    $("calStatus").textContent = "Couldn't load the calendar. Check your connection and reload.";
+    renderCal();
+  }
+}
+
+// =====================================================================
+// Lights — through your Cloudflare "Govee" connector's browser route.
+// The address (with its secret) is kept on this device only.
+// =====================================================================
+const LIGHTS_KEY = "lightsConnector";
+let lights = [], checkedAt = null, lightsTimer = null, refreshTimer = null;
+const lightSel = new Set();
+const pending = {};
+const apiBase = () => { const a = storageGet(LIGHTS_KEY); return a ? a.replace(/\/(mcp|api)\/?$/, "") : null; };
+
+function lpill(text, ok) { $("lightsPill").textContent = text; $("lightsPill").classList.toggle("ok", !!ok); }
+function lmsg(text, retry) { $("lightsMsg").textContent = text || ""; $("lightsMsg").hidden = !text; $("lightsRetry").hidden = !retry; }
+
+async function api(tool, args) {
+  const base = apiBase();
+  if (!base) throw new Error("not set up");
+  let res;
+  try {
+    res = await fetch(base + "/api", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tool, args: args || {} }) });
+  } catch {
+    throw new Error("Couldn't reach the lights connector. Check this device is online, and that the connector has been updated with the dashboard route.");
+  }
+  if (res.status === 404) throw new Error("The lights connector address isn't right. Check it in Dashboard settings.");
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!data) throw new Error("The lights connector gave an unexpected answer (" + res.status + ").");
+  if (!data.ok) throw new Error(data.error || "The lights connector reported a problem.");
+  return data.result;
+}
+
+function stateText(l) {
+  if (pending[l.id]) return pending[l.id];
+  if (l.error) return "Couldn't read this light";
+  if (l.online === false) return "Offline";
+  if (l.on === true) return "On" + (l.brightness ? ` · ${l.brightness}%` : "");
+  if (l.on === false) return "Off";
+  return "";
+}
+function renderLights() {
+  $("lightList").replaceChildren(...lights.map((l) => {
+    const li = el("li", (lightSel.has(l.id) ? "sel" : "") + (l.online === false ? " offline" : ""));
+    const name = el("button", "lname");
+    name.setAttribute("aria-pressed", lightSel.has(l.id));
+    name.setAttribute("aria-label", (lightSel.has(l.id) ? "Deselect " : "Select ") + l.name);
+    const dot = el("b", "ldot");
+    dot.style.setProperty("--c", l.on && l.color && l.color !== "#000000" ? l.color : "transparent");
+    const text = el("span", null, l.name);
+    const st = stateText(l);
+    if (st) text.append(el("small", pending[l.id] && pending[l.id] !== "Sending…" ? "bad" : null, st));
+    name.append(el("i", null, lightSel.has(l.id) ? "✓" : ""), dot, text);
+    name.onclick = () => { lightSel.has(l.id) ? lightSel.delete(l.id) : lightSel.add(l.id); renderLights(); renderAdjust(); };
+    const sw = el("button", "lswitch" + (l.on ? " is-on" : ""));
+    sw.setAttribute("role", "switch");
+    sw.setAttribute("aria-checked", l.on ? "true" : "false");
+    sw.setAttribute("aria-label", (l.on ? "Turn off " : "Turn on ") + l.name);
+    sw.append(el("span"));
+    sw.onclick = () => change([l], { power: l.on ? "off" : "on" });
+    li.append(name, sw);
+    return li;
+  }));
+  $("lightsChecked").textContent = checkedAt ? "Checked at " + new Date(checkedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
+}
+const chosen = () => lights.filter((l) => lightSel.has(l.id));
+function renderAdjust() {
+  const list = chosen(), n = list.length;
+  $("adjust").classList.toggle("disabled", n === 0);
+  $("adjustLabel").textContent = n === 0 ? "Tap a light's name to change its colour or brightness"
+    : `Colour and brightness for ${n === lights.length ? "all lights" : n === 1 ? list[0].name : n + " lights"}`;
+  const avg = n ? Math.round(list.reduce((t, l) => t + (l.brightness || 50), 0) / n) : 50;
+  if (document.activeElement !== $("bright")) { $("bright").value = avg; $("brightVal").textContent = avg + "%"; }
+  $("sceneBtn").hidden = n !== 1;
+  if (n !== 1) $("sceneBox").hidden = true;
+}
+
+async function loadLights() {
+  try {
+    const r = await api("list_lights");
+    lights = (Array.isArray(r?.lights) ? r.lights : []).filter((l) => l && typeof l.id === "string" && typeof l.name === "string");
+    checkedAt = r?.checkedAt || new Date().toISOString();
+    for (const id of [...lightSel]) if (!lights.some((l) => l.id === id)) lightSel.delete(id);
+    for (const k in pending) delete pending[k];
+    if (!lights.length) { lpill("No lights", false); lmsg("The connector can't see any Govee lights on your account.", true); $("lightsBody").hidden = true; return; }
+    lpill("Connected", true); lmsg("");
+    $("lightsSetup").hidden = true;
+    $("lightsBody").hidden = false;
+    renderLights(); renderAdjust();
+  } catch (e) {
+    if (!lights.length) { lpill("Problem", false); lmsg(e.message, true); $("lightsBody").hidden = true; }
+    else $("lightsChecked").textContent = "Couldn't refresh just now";
+  }
+}
+
+async function change(targets, patch) {
+  if (!targets.length) return;
+  targets.forEach((l) => (pending[l.id] = "Sending…"));
+  renderLights();
+  const results = await Promise.allSettled(targets.map((l) => api("set_light", { id: l.id, sku: l.sku, ...patch })));
+  let firstErr = null;
+  results.forEach((r, i) => {
+    const l = targets[i];
+    if (r.status === "fulfilled") {
+      delete pending[l.id];
+      if (patch.power) l.on = patch.power === "on";
+      if (patch.brightness) { l.brightness = patch.brightness; l.on = true; }
+      if (patch.color) { l.color = patch.color; l.on = true; }
+    } else {
+      pending[l.id] = l.online === false ? "Offline: didn't respond" : "Didn't go through";
+      firstErr = firstErr || r.reason;
+    }
+  });
+  renderLights(); renderAdjust();
+  lmsg(firstErr ? firstErr.message : "");
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(loadLights, 6000);
+}
+
+$("allOn").onclick = () => change(lights.filter((l) => l.online !== false), { power: "on" });
+$("allOff").onclick = () => change(lights.filter((l) => l.online !== false), { power: "off" });
+$("bright").oninput = () => { $("brightVal").textContent = $("bright").value + "%"; };
+$("bright").onchange = () => change(chosen(), { brightness: Number($("bright").value) });
+$("colorPick").onchange = () => change(chosen(), { color: $("colorPick").value });
+document.querySelectorAll("#swatches .swatch[data-c]").forEach((b) => (b.onclick = () => change(chosen(), { color: b.dataset.c })));
+$("lightsRefresh").onclick = () => { $("lightsChecked").textContent = "Checking…"; loadLights(); };
+$("lightsRetry").onclick = () => { lmsg("Checking your lights…"); loadLights(); };
+
+$("sceneBtn").onclick = async () => {
+  const l = chosen()[0];
+  if (!l) return;
+  const box = $("sceneBox");
+  box.hidden = false;
+  box.replaceChildren(el("span", "adjust-label", "Loading scenes…"));
+  try {
+    const r = await api("list_scenes", { id: l.id, sku: l.sku });
+    const list = Array.isArray(r?.scenes) ? r.scenes : [];
+    if (!list.length) { box.replaceChildren(el("span", "adjust-label", "This light has no scenes.")); return; }
+    const sel = el("select");
+    sel.id = "sceneSelect";
+    sel.setAttribute("aria-label", "Scene for " + l.name);
+    sel.append(...list.map((n) => { const o = el("option", null, n); o.value = n; return o; }));
+    const go = el("button", "btn", "Start scene");
+    go.onclick = async () => {
+      go.disabled = true; go.textContent = "Starting…";
+      try { await api("set_scene", { id: l.id, sku: l.sku, scene: sel.value }); go.textContent = "Started"; l.on = true; renderLights(); lmsg(""); }
+      catch (e) { lmsg(e.message); }
+      setTimeout(() => { go.disabled = false; go.textContent = "Start scene"; }, 1500);
+    };
+    box.replaceChildren(sel, go);
+  } catch (e) { box.replaceChildren(el("span", "adjust-label", e.message)); }
+};
+
+$("lightsSetup").onsubmit = (e) => {
+  e.preventDefault();
+  const v = $("lightsAddr").value.trim();
+  const ok = /^https:\/\/[^/\s]+\/[^/\s]{16,}\/(mcp|api)\/?$/.test(v);
+  $("lightsAddrError").textContent = ok ? "" : "Paste the full connector address, ending in /mcp.";
+  $("lightsAddrError").hidden = ok;
+  if (!ok) return;
+  storageSet(LIGHTS_KEY, v);
+  lmsg("Checking your lights…");
+  startLights();
+};
+function startLights() {
+  clearInterval(lightsTimer);
+  if (!apiBase()) {
+    lpill("Not set up", false);
+    lmsg("To control the lights from this device, paste your lights connector address once. It's kept on this device only.");
+    $("lightsSetup").hidden = false;
+    $("lightsBody").hidden = true;
+    return;
+  }
+  $("lightsSetup").hidden = true;
+  loadLights();
+  lightsTimer = setInterval(() => { if (document.visibilityState === "visible") loadLights(); }, 5 * 60 * 1000);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && apiBase() && checkedAt && Date.now() - new Date(checkedAt) > 2 * 60 * 1000) loadLights();
+});
+
+// ---------- Settings ----------
+$("settingsBtn").onclick = () => {
+  $("setListCode").textContent = listCode || "Not connected yet";
+  $("setForgetList").hidden = !listCode;
+  $("setLights").textContent = apiBase() ? "Connected on this device" : "Not set up on this device";
+  $("setForgetLights").hidden = !apiBase();
+  $("settingsDialog").showModal();
+};
+$("settingsClose").onclick = () => $("settingsDialog").close();
+function twoStep(btn, confirmText, action) {
+  const label = btn.textContent;
+  let t = null;
+  btn.onclick = () => {
+    if (t) { clearTimeout(t); t = null; btn.textContent = label; action(); return; }
+    btn.textContent = confirmText;
+    t = setTimeout(() => { t = null; btn.textContent = label; }, 3000);
+  };
+}
+twoStep($("setForgetList"), "Tap again to disconnect", () => { storageDel("listCode"); location.reload(); });
+twoStep($("setForgetLights"), "Tap again to forget", () => { storageDel(LIGHTS_KEY); lights = []; $("settingsDialog").close(); startLights(); });
+
+// ---------- Start ----------
+tick();
+setInterval(tick, 10000);
+connectFirebase();
+startLights();
+</script>
+</body>
+</html>

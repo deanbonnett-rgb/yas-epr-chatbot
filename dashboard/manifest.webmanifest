@@ -1,0 +1,13 @@
+{
+  "name": "Our Home Dashboard",
+  "short_name": "Home",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#f3f5f1",
+  "theme_color": "#2f7d4f",
+  "icons": [
+    { "src": "../shopping-list/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
