@@ -42,6 +42,8 @@
   h3 { font: 600 17px/1.2 var(--display); margin: 0; }
 
   .col-home, .col-cal { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 96px; display: flex; flex-direction: column; gap: 14px; }
+  /* Keep every block at its full height so the column scrolls instead of squashing lists to nothing. */
+  .col-home > *, .col-cal > * { flex-shrink: 0; }
   .col-list { height: calc(100% - 64px - env(safe-area-inset-bottom, 0px)); }
   .col-list iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
 
