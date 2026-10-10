@@ -358,6 +358,7 @@
   <div class="field-label">Football fixtures</div>
   <p style="margin-top:0">Fixtures sync into the shared calendar, so everyone on the list sees them. A device with the lights connector keeps them up to date.</p>
   <div id="teamList"></div>
+  <div class="row" style="align-items:center;justify-content:space-between;margin-top:6px"><span class="status" id="fxStatus"></span><button class="link-btn" id="fxRefresh" type="button">Refresh fixtures now</button></div>
   <form class="setup-form" id="teamForm" style="margin-top:8px">
     <label class="field-label" for="teamInput" style="margin:0">Add a team (FotMob team link or number)</label>
     <input class="text-input" id="teamInput" placeholder="e.g. 10260 for Manchester United" autocomplete="off" spellcheck="false">
@@ -369,7 +370,7 @@
 </dialog>
 
 <script type="module">
-import { firebaseConfig } from "../firebase-config.js?v=12";
+import { firebaseConfig } from "../firebase-config.js?v=13";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = (id) => document.getElementById(id);
@@ -891,7 +892,7 @@ function fixtureEvent(team, f) {
 }
 async function syncFixtures(force) {
   if (fxBusy || !apiBase() || !listRef || !fsApi) return;
-  if (!force && Date.now() - Number(storageGet("fxSyncedAt") || 0) < FX_EVERY) return;
+  if (!force && Date.now() - Number(storageGet("fxSyncedAt2") || 0) < FX_EVERY) return;
   fxBusy = true;
   const keep = addDays(todayISO(), -14); // leave older results alone
   const updates = {}, deletes = {};
@@ -901,6 +902,7 @@ async function syncFixtures(force) {
       const wanted = {};
       for (const f of r?.events || []) {
         const ev = fixtureEvent(team, f);
+        if (ev && /^starting in \d+ min/i.test(ev.title)) throw new Error("the connector needs updating in Cloudflare (it's reading reminder names instead of match names)");
         if (ev && ev.date >= keep) wanted["fx" + team.id + "_" + hashId(f.uid)] = ev;
       }
       for (const [id, ev] of Object.entries(wanted)) {
@@ -914,12 +916,19 @@ async function syncFixtures(force) {
     for (const e of events) if (e.source && e.source.startsWith("fotmob:") && !ids.has(e.source)) deletes["events." + e.id] = fsApi.deleteField();
     if (Object.keys(updates).length) await fsApi.setDoc(listRef, { events: updates }, { merge: true });
     if (Object.keys(deletes).length) await fsApi.updateDoc(listRef, deletes);
-    storageSet("fxSyncedAt", String(Date.now()));
+    storageSet("fxSyncedAt2", String(Date.now()));
+    $("fxStatus").textContent = "Fixtures updated " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   } catch (e) {
     $("calStatus").textContent = "Couldn't update football fixtures: " + e.message;
   } finally { fxBusy = false; }
 }
 setInterval(() => { if (document.visibilityState === "visible") syncFixtures(false); }, 30 * 60 * 1000);
+$("fxRefresh").onclick = async () => {
+  if (!apiBase()) { $("fxStatus").textContent = "Connect the lights connector on this device first."; return; }
+  $("fxStatus").textContent = "Updating…";
+  await syncFixtures(true);
+  if ($("fxStatus").textContent === "Updating…") $("fxStatus").textContent = $("calStatus").textContent;
+};
 
 function renderTeams() {
   const box = $("teamList");
