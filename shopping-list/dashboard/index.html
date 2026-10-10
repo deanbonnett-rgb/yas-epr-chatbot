@@ -203,6 +203,10 @@
   .row2 > div { min-width: 0; }
   .shop-pick .shop-chip.who-a.active, .shop-pick .shop-chip.who-b.active, .shop-pick .shop-chip.who-both.active, .shop-pick .shop-chip.who-bday.active { background: var(--who); border-color: var(--who); color: var(--card); }
   #evDelete { margin-top: 10px; }
+  .section-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 2px; margin-top: 2px; color: var(--muted); font-size: 14px; font-weight: 600; text-align: left; }
+  .section-toggle .chev { font-size: 16px; transition: transform .15s ease; }
+  .section-toggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+  .up-body { display: flex; flex-direction: column; gap: 14px; }
 
   @media (prefers-reduced-motion: reduce) { .lswitch span { transition: none; } }
 </style>
@@ -300,9 +304,11 @@
   </div>
   <ul id="dayEvents"></ul>
   <div class="empty" id="dayEmpty" hidden>Nothing planned. Tap + Add to put something on.</div>
-  <div class="section-title"><span>Coming up</span></div>
-  <ul id="upcoming"></ul>
-  <div class="empty" id="upcomingEmpty" hidden>Nothing in the next two weeks.</div>
+  <button class="section-toggle" id="upToggle" aria-expanded="true" aria-controls="upBody"><span id="upTitle">Coming up</span><span class="chev" aria-hidden="true">▾</span></button>
+  <div class="up-body" id="upBody">
+    <ul id="upcoming"></ul>
+    <div class="empty" id="upcomingEmpty" hidden>Nothing in the next two weeks.</div>
+  </div>
   <p class="status" id="calStatus">Connecting…</p>
 </section>
 </div>
@@ -377,7 +383,7 @@
 </dialog>
 
 <script type="module">
-import { firebaseConfig } from "../firebase-config.js?v=14";
+import { firebaseConfig } from "../firebase-config.js?v=15";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = (id) => document.getElementById(id);
@@ -582,6 +588,7 @@ function renderDay() {
   }
   $("upcoming").replaceChildren(...up.map(([e, day]) => eventRow(e, day, true)));
   $("upcomingEmpty").hidden = !loaded || up.length > 0;
+  $("upTitle").textContent = up.length ? `Coming up (${up.length})` : "Coming up";
 }
 function renderToday() {
   const t = todayISO();
@@ -703,6 +710,14 @@ $("namesSave").onclick = async () => {
   names = next; renderCal();
   await save(() => fsApi.setDoc(listRef, { calendarNames: next, calendarColours: colours }, { merge: true }));
 };
+// Coming up can be folded away; each device remembers its own choice.
+function setUpOpen(open) {
+  $("upToggle").setAttribute("aria-expanded", open ? "true" : "false");
+  $("upBody").hidden = !open;
+  storageSet("upOpen", open ? "1" : "0");
+}
+$("upToggle").onclick = () => setUpOpen($("upBody").hidden);
+setUpOpen(storageGet("upOpen") !== "0");
 $("calPrev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); renderGrid(); };
 $("calNext").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); renderGrid(); };
 $("calToday").onclick = () => goToDay(todayISO());
