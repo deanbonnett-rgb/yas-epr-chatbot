@@ -29,6 +29,15 @@
     button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
     .icon-btn { background: transparent; color: var(--muted); padding: 8px; font-size: 22px; line-height: 1; }
 
+    /* Bottom tabs: Home and Calendar open the home dashboard; List is this app. */
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; background: var(--card);
+      border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .tabs a { flex: 1; padding: 8px 4px 10px; color: var(--muted); font-size: 13px; text-decoration: none;
+      display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .tabs a span { font-size: 20px; line-height: 1; }
+    .tabs a[aria-current="page"] { color: var(--accent); font-weight: 600; }
+    .in-frame .tabs { display: none; }
+
     /* Use-by date banner */
     .date-card { background: var(--accent); color: #fff; border-radius: 16px; padding: 16px; margin-bottom: 16px; }
     @media (prefers-color-scheme: dark) { .date-card { color: #0d1a12; } }
@@ -150,11 +159,6 @@
   <header>
     <h1>🛒 Our Shopping List</h1>
     <div>
-      <a class="icon-btn" id="dashLink" href="../dashboard/#cal" aria-label="Calendar and lights" title="Calendar and lights" style="text-decoration:none;display:inline-block">📅</a>
-      <script>
-        // Inside the dashboard the list is already next to the calendar, so hide the shortcut there.
-        if (window.top !== window) document.getElementById("dashLink").hidden = true;
-      </script>
       <button class="icon-btn" id="historyBtn" aria-label="Past shops">🕘</button>
       <button class="icon-btn" id="settingsBtn" aria-label="Share &amp; settings">⚙︎</button>
     </div>
@@ -200,6 +204,18 @@
 
   <p class="status" id="status"></p>
 </main>
+
+<nav class="tabs" aria-label="Sections">
+  <a href="../dashboard/#home"><span>⌂</span>Home</a>
+  <a href="./" aria-current="page"><span>🛒</span>List</a>
+  <a href="../dashboard/#cal"><span>▦</span>Calendar</a>
+</nav>
+<script>
+  // Inside the dashboard its own tabs already do this, so hide these there.
+  if (window.top !== window) document.documentElement.classList.add("in-frame");
+  // List is the page you're on: tapping it just scrolls back to the top.
+  document.querySelector('.tabs a[aria-current="page"]').onclick = (e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+</script>
 
 <dialog id="history">
   <h2>Past shops</h2>
@@ -274,6 +290,6 @@
   </div>
 </dialog>
 
-<script type="module" src="app.js?v=9"></script>
+<script type="module" src="app.js?v=10"></script>
 </body>
 </html>
