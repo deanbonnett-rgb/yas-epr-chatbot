@@ -396,7 +396,7 @@
 </dialog>
 
 <script type="module">
-import { firebaseConfig } from "../firebase-config.js?v=16";
+import { firebaseConfig } from "../firebase-config.js?v=17";
 
 const FIREBASE = "https://www.gstatic.com/firebasejs/10.12.2";
 const $ = (id) => document.getElementById(id);
@@ -520,7 +520,7 @@ const REMIND = [["none", "None"], ["at", "On the day"], ["1h", "1 hour before"],
 const remindLabel = (r) => (REMIND.find(([v]) => v === r) || [])[1];
 const whoName = (w) => (w === "football" ? "Football" : w === "bday" ? "Birthday" : w === "both" ? "Both" : names[w] || (w === "a" ? "Dean" : "Beth"));
 const whoOf = (ev) => (ALL_WHO.includes(ev.who) ? ev.who : "both");
-const icon = (ev) => (whoOf(ev) === "bday" ? "🎂 " : whoOf(ev) === "football" ? "⚽ " : "");
+const icon = (ev) => (whoOf(ev) === "bday" ? "🎂 " : whoOf(ev) === "football" && !/^\s*⚽/.test(ev.title || "") ? "⚽ " : "");
 const newId = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 function occursOn(ev, day) {
@@ -787,14 +787,15 @@ const apiBase = () => { const a = storageGet(LIGHTS_KEY); return a ? a.replace(/
 function lpill(text, ok) { $("lightsPill").textContent = text; $("lightsPill").classList.toggle("ok", !!ok); }
 function lmsg(text, retry) { $("lightsMsg").textContent = text || ""; $("lightsMsg").hidden = !text; $("lightsRetry").hidden = !retry; }
 
-async function api(tool, args) {
+async function api(tool, args, ms = 25000) {
   const base = apiBase();
   if (!base) throw new Error("not set up");
   let res;
   try {
-    res = await fetch(base + "/api", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tool, args: args || {} }) });
-  } catch {
-    throw new Error("Couldn't reach the lights connector. Check this device is online, and that the connector has been updated with the dashboard route.");
+    res = await fetch(base + "/api", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tool, args: args || {} }), signal: AbortSignal.timeout(ms) });
+  } catch (e) {
+    if (e?.name === "TimeoutError") throw new Error("Govee is slow to answer right now. Your lights may still respond; try again in a minute.");
+    throw new Error(navigator.onLine === false ? "This device is offline." : "Couldn't reach the lights connector. Check this device's internet connection and try again.");
   }
   if (res.status === 404) throw new Error("The lights connector address isn't right. Check it in Dashboard settings.");
   let data = null;
@@ -806,7 +807,7 @@ async function api(tool, args) {
 
 function stateText(l) {
   if (pending[l.id]) return pending[l.id];
-  if (l.error) return "Couldn't read this light";
+  if (l.error) return "No answer from Govee";
   if (l.online === false) return "Offline";
   if (l.on === true) return "On" + (l.brightness ? ` · ${l.brightness}%` : "");
   if (l.on === false) return "Off";
@@ -847,6 +848,7 @@ $("lightsChoose").onclick = async () => {
   if (listRef && fsApi) save(() => fsApi.setDoc(listRef, { lightsShown: shownIds }, { merge: true }));
   else storageSet("lightsShown", JSON.stringify(shownIds));
   setChoosing(false);
+  loadLights(); // fetch the state of any lights that were just added
 };
 try { const v = JSON.parse(storageGet("lightsShown") || "null"); if (Array.isArray(v)) shownIds = v; } catch {}
 
@@ -887,10 +889,18 @@ function renderAdjust() {
   if (n !== 1) $("sceneBox").hidden = true;
 }
 
+try { const c = JSON.parse(storageGet("lightsCache") || "null"); if (Array.isArray(c?.lights)) { lights = c.lights; checkedAt = c.checkedAt || null; } } catch {}
 async function loadLights() {
   try {
-    const r = await api("list_lights");
-    lights = (Array.isArray(r?.lights) ? r.lights : []).filter((l) => l && typeof l.id === "string" && typeof l.name === "string");
+    const r = await api("list_lights", shownIds && !choosing ? { ids: shownIds } : {});
+    const fresh = (Array.isArray(r?.lights) ? r.lights : []).filter((l) => l && typeof l.id === "string" && typeof l.name === "string");
+    // Lights Govee couldn't answer for keep their last known state, marked as not confirmed.
+    lights = fresh.map((l) => {
+      const old = lights.find((x) => x.id === l.id);
+      if ((l.error || l.skipped) && old) return { ...old, name: l.name, sku: l.sku, error: l.error, skipped: l.skipped };
+      return l;
+    });
+    storageSet("lightsCache", JSON.stringify({ lights: lights.map(({ error, skipped, ...l }) => l), checkedAt: r?.checkedAt }));
     checkedAt = r?.checkedAt || new Date().toISOString();
     for (const id of [...lightSel]) if (!lights.some((l) => l.id === id)) lightSel.delete(id);
     for (const k in pending) delete pending[k];
@@ -901,7 +911,15 @@ async function loadLights() {
     renderLights(); renderAdjust();
   } catch (e) {
     if (!lights.length) { lpill("Problem", false); lmsg(e.message, true); $("lightsBody").hidden = true; }
-    else $("lightsChecked").textContent = "Couldn't refresh just now";
+    else {
+      // Keep the switches usable with the last known state; just say the refresh failed.
+      lpill("Connected", true);
+      $("lightsSetup").hidden = true;
+      $("lightsBody").hidden = false;
+      lmsg(e.message);
+      renderLights(); renderAdjust();
+      $("lightsChecked").textContent = "Couldn't refresh just now";
+    }
   }
 }
 
